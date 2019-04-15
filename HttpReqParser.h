@@ -14,12 +14,19 @@
 
 #include <stdlib.h>
 
-typedef struct HttpReqHead_T *HttpReqHead_T;
+struct HttpReqHead_T {
+        char *method;   /*ex: GET*/
+        char *url;      /*ex: http://www.cs.cmu.edu/~prs/bio.html*/
+        char *host;     /*ex: www.cs.cmu.edu*/
+        char *protocol; /*ex: HTTP/1.1*/
+        int port;       /*ex: 80*/
+}*HttpReqHead_T;
 
 /*
  * Function:  new_req_head 
  * --------------------
- * Allocates space for a HttpReqHead_T and returns it
+ * Allocates space for a HttpReqHead_T, and returns it
+ * Sets default values for fields, NULL for strings, 80 for port
  * 
  *  returns: HttpReqHead_T
  */
