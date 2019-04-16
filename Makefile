@@ -11,7 +11,7 @@ EXECS   = proxy clean
 
 all: $(EXECS)
 
-proxy: proxy.o
+proxy: proxy.o HttpReqParser.o HttpResParser.o
 	$(CC) $(LDFLAGS) $^ -o $@ $(LDLIBS)
 
 # To get *any* .o file, compile its .c file with the following rule.

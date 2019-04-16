@@ -8,14 +8,16 @@
  * HTTP response by taking in a buffer and storing it in
  * struct which has values for every possible optional argument
  */
+#include <stdlib.h>
 
 #ifndef HTTP_RESPONSE_PARSER_H_INCLUDED
 #define HTTP_RESPONSE_PARSER_H_INCLUDED
 
-#include <stdlib.h>
-
-
-typedef struct HttpResHead_T *HttpResHead_T;
+typedef struct HttpResHead_T{
+        int max_age;
+        int header_length;
+        int content_length;
+}*HttpResHead_T;
 
 /*
  * Function:  new_res_head 

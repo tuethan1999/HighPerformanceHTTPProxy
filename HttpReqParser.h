@@ -8,13 +8,14 @@
  * HTTP requests by taking in a buffer and storing it in
  * struct which has values for every possible optional argument
  */
-
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
 #ifndef HTTP_REQUEST_PARSER_H_INCLUDED
 #define HTTP_REQUEST_PARSER_H_INCLUDED
 
-#include <stdlib.h>
 
-struct HttpReqHead_T {
+typedef struct HttpReqHead_T {
         char *method;   /*ex: GET*/
         char *url;      /*ex: http://www.cs.cmu.edu/~prs/bio.html*/
         char *host;     /*ex: www.cs.cmu.edu*/
