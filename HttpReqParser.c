@@ -23,7 +23,7 @@
         #define CONTENT_LENGTH 20
 #endif
 
-int isnumber(char* s){
+int string_is_number(char* s){
         int length = strlen(s);
         for(int i = 0; i < length; i ++){
                 if(!isdigit(s[i]))
@@ -73,7 +73,7 @@ int parse_http_req(HttpReqHead_T header, char* buffer, int buffer_size)
                         token = strtok(NULL, "\r\n: ");
                         header->host = strdup(token);
                 }
-                if(isnumber(token)){
+                if(string_is_number(token)){
                         header->port = atoi(token);
                 }
                 /*else if(strncmp("User-Agent", token, strlen("User-Agent")) == 0){

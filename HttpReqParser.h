@@ -9,8 +9,7 @@
  * struct which has values for every possible optional argument
  */
 #include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
+
 #ifndef HTTP_REQUEST_PARSER_H_INCLUDED
 #define HTTP_REQUEST_PARSER_H_INCLUDED
 
