@@ -11,7 +11,7 @@ EXECS   = proxy clean nateproxy
 
 all: $(EXECS)
 
-proxy: proxy.o HttpReqParser.o HttpResParser.o HttpCache.o CacheObject.o
+proxy: proxy.o HttpReqParser.o HttpResParser.o HttpCache.o CacheObject.o HandleMessage.o ServerHandler.o
 	$(CC) $(LDFLAGS) $^ -o $@ $(LDLIBS)
 nateproxy: nate_proxy.o HttpReqParser.o HttpResParser.o HttpCache.o CacheObject.o HandleMessage.o
 	$(CC) $(LDFLAGS) $^ -o $@ $(LDLIBS)

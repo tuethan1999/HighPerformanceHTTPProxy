@@ -6,6 +6,7 @@
 #include "HttpResParser.h"
 #include "HttpCache.h"
 #include "HandleMessage.h"
+#include "ServerHandler.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -32,7 +33,7 @@ int SetupProxyServer(int port_number);
 Serv_request ProxyServer( int parent_fd);
 HttpReqHead_T parseClientRequest(Serv_request serv_r);
 char* add_age_to_header(char* msg, int* msg_size, int age);
-void handleClient(Cache_T cache, msg_buffer *buffer_obj, int fd);
+void handleClient(Cache_T cache, msg_buffer *buffer_obj, int fd, ServerListNode *server_list);
 void handleServer(Cache_T cache, msg_buffer *buffer_obj, int fd);
 
 
@@ -55,6 +56,7 @@ int main(int argc, char *argv[])
 
         msg_buffer buff_array[20]; // TODO discuss size of the array
         Cache_T cache = new_cache();
+        ServerListNode *server_list = create_server_list();
 
         //char *server_response;
         while(1){
@@ -79,9 +81,13 @@ int main(int argc, char *argv[])
                                         printf("incoming message from fd %d\n", fd);
                                         handle_incoming_message(buff_array, fd, listen_fd, &master_fd_set, &max_sock);
                                         print_partial_msg_buffer(buff_array, 20);
-                                        /*find out if server or not*/
-                                        handleClient(cache, buff_array, fd);
-                                        handleServer(cache, buff_array, fd);
+                                        char *url = is_server(fd, server_list);
+                                        if (url == NULL) {
+                                                handleClient(cache, buff_array, fd, server_list);
+                                        }
+                                        else {
+                                                handleServer(cache, buff_array, fd);
+                                        }
 
                                 }
                         }
@@ -157,22 +163,31 @@ HttpReqHead_T parseClientRequest(Serv_request serv_r)
         return request_header;
 }
 
-void handleClient(Cache_T cache, msg_buffer* buff_array, int fd){
+void handleClient(Cache_T cache, msg_buffer* buff_array, int fd, ServerListNode *server_list){
         HttpReqHead_T req_header = new_req_head();
         if(parse_http_req(req_header, buff_array[fd].buffer, buff_array[fd].length))
         {
                 print_http_req_head(req_header);
                 CacheObj_T cache_obj = find_by_url(cache, req_header->url);
                 if(cache_obj == NULL){ 
+                        printf("doesn't exist in cache\n");
                         cache_obj = new_cache_object();
+                        printf("looking for seg fault\n");
                         cache_obj->req_header = req_header;
+                        printf("looking for seg fault\n");
                         strcpy(cache_obj->url, req_header->url);
+                        printf("looking for seg fault\n");
                         memcpy(cache_obj->request_buffer, buff_array[fd].buffer, buff_array[fd].length);
+                        printf("looking for seg fault\n");
                         cache_obj->request_length = buff_array[fd].length;
+                        printf("looking for seg fault\n");
                         cache_obj->last_requested = time(NULL);
+                        printf("looking for seg fault\n");
                         utarray_push_back(cache_obj->client_fds, &fd);
+                        printf("looking for seg fault\n");
                         insert_into_cache(cache, cache_obj);
-                        /*forward to server*/
+                        printf("looking for seg fault\n");
+                        int serv_fd = inititate_server_connection(req_header, server_list);
                 }
                 else{
                         cache_obj->last_requested = time(NULL);
