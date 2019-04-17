@@ -80,7 +80,7 @@ int main(int argc, char *argv[])
                                 if (FD_ISSET(fd, &copy_fd_set)) {
                                         printf("incoming message from fd %d\n", fd);
                                         handle_incoming_message(buff_array, fd, listen_fd, &master_fd_set, &max_sock);
-                                        print_partial_msg_buffer(buff_array, 20);
+                                        //print_partial_msg_buffer(buff_array, 20);
                                         char *url = is_server(fd, server_list);
                                         if (url == NULL) {
                                                 handleClient(cache, buff_array, fd, server_list);
@@ -169,24 +169,18 @@ void handleClient(Cache_T cache, msg_buffer* buff_array, int fd, ServerListNode 
         {
                 print_http_req_head(req_header);
                 CacheObj_T cache_obj = find_by_url(cache, req_header->url);
-                if(cache_obj == NULL){ 
+                if(cache_obj == NULL){
                         printf("doesn't exist in cache\n");
                         cache_obj = new_cache_object();
-                        printf("looking for seg fault\n");
                         cache_obj->req_header = req_header;
-                        printf("looking for seg fault\n");
-                        strcpy(cache_obj->url, req_header->url);
-                        printf("looking for seg fault\n");
+                        cache_obj->url = malloc(strlen(req_header->url) + 1);
+                        strncpy(cache_obj->url, req_header->url, strlen(req_header->url));
+                        cache_obj->request_buffer = malloc(buff_array[fd].length);
                         memcpy(cache_obj->request_buffer, buff_array[fd].buffer, buff_array[fd].length);
-                        printf("looking for seg fault\n");
                         cache_obj->request_length = buff_array[fd].length;
-                        printf("looking for seg fault\n");
                         cache_obj->last_requested = time(NULL);
-                        printf("looking for seg fault\n");
                         utarray_push_back(cache_obj->client_fds, &fd);
-                        printf("looking for seg fault\n");
                         insert_into_cache(cache, cache_obj);
-                        printf("looking for seg fault\n");
                         int serv_fd = inititate_server_connection(req_header, server_list);
                 }
                 else{
