@@ -60,7 +60,7 @@ CacheObj_T find_by_url(Cache_T cache, char* url);
  *
  *  returns: None
  */
-void delete_expired(Cache_T cache, int max_age);
+void delete_expired(Cache_T cache);
 
 /*
  * Function:  delete_by_sockfd

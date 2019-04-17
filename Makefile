@@ -7,7 +7,7 @@ CFLAGS  = -O2 -flto -g -std=gnu99 -Wall -Wextra -pedantic
 LDFLAGS = -g
 LDLIBS  = -O2 -lm
 
-EXECS   = proxy clean
+EXECS   = proxy clean nateproxy
 
 all: $(EXECS)
 
