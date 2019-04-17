@@ -31,6 +31,7 @@ typedef struct Serv_request{
 int SetupProxyServer(int port_number);
 Serv_request ProxyServer( int parent_fd);
 HttpReqHead_T parseClientRequest(Serv_request serv_r);
+char* add_age_to_header(char* msg, int* msg_size, int age);
 void handleClient(Cache_T cache, msg_buffer *buffer_obj, int fd);
 void handleServer(Cache_T cache, msg_buffer *buffer_obj, int fd);
 
@@ -52,7 +53,7 @@ int main(int argc, char *argv[])
         FD_SET(listen_fd, &master_fd_set);
         int max_sock = listen_fd;
 
-        msg_buffer buf_array[20]; // TODO discuss size of the array
+        msg_buffer buff_array[20]; // TODO discuss size of the array
         Cache_T cache = new_cache();
 
         //char *server_response;
@@ -76,16 +77,16 @@ int main(int argc, char *argv[])
                         for (int fd = 0; fd < max_sock+1; fd++) {
                                 if (FD_ISSET(fd, &copy_fd_set)) {
                                         printf("incoming message from fd %d\n", fd);
-                                        handle_incoming_message(buf_array, fd, listen_fd, &master_fd_set, &max_sock);
-                                        print_partial_msg_buffer(buf_array, 20);
+                                        handle_incoming_message(buff_array, fd, listen_fd, &master_fd_set, &max_sock);
+                                        print_partial_msg_buffer(buff_array, 20);
                                         /*find out if server or not*/
-                                        handleClient(cache, buf_array, fd);
-                                        handleServer(cache, buf_array, fd);
+                                        handleClient(cache, buff_array, fd);
+                                        handleServer(cache, buff_array, fd);
 
                                 }
                         }
                 }
-
+                delete_expired(cache);
                 //Serv_request serv_r = ProxyServer(listen_fd);
                 //HttpReqHead_T req_h = parseClientRequest(serv_r);
                 //print_http_req_head(req_h);
@@ -158,22 +159,28 @@ HttpReqHead_T parseClientRequest(Serv_request serv_r)
 
 void handleClient(Cache_T cache, msg_buffer* buff_array, int fd){
         HttpReqHead_T req_header = new_req_head();
-        if(parse_http_req(req_header, buf_array[fd].buffer, buf_array[fd].length))
+        if(parse_http_req(req_header, buff_array[fd].buffer, buff_array[fd].length))
         {
+                print_http_req_head(req_header);
                 CacheObj_T cache_obj = find_by_url(cache, req_header->url);
                 if(cache_obj == NULL){ 
                         cache_obj = new_cache_object();
+                        cache_obj->req_header = req_header;
                         strcpy(cache_obj->url, req_header->url);
-                        memcpy(cache_obj->request_buffer, buf_array[fd].buffer, buf_array[fd].length);
-                        cache_obj->request_length = buf_array[fd].length;
+                        memcpy(cache_obj->request_buffer, buff_array[fd].buffer, buff_array[fd].length);
+                        cache_obj->request_length = buff_array[fd].length;
                         cache_obj->last_requested = time(NULL);
                         utarray_push_back(cache_obj->client_fds, &fd);
                         insert_into_cache(cache, cache_obj);
                         /*forward to server*/
                 }
                 else{
+                        cache_obj->last_requested = time(NULL);
+                        int final_msg_size = buff_array[fd].length;
+                        char *final_msg = add_age_to_header(buff_array[fd].buffer, &final_msg_size, 0);
+                        free(final_msg);
                         /*write back to client*/
-                        /*remove client from clientfd*/
+                        delete_from_clientfds(cache_obj, fd);
                 }
         }
         else{
@@ -183,16 +190,46 @@ void handleClient(Cache_T cache, msg_buffer* buff_array, int fd){
 
 void handleServer(Cache_T cache, msg_buffer* buff_array, int fd){
         HttpResHead_T res_header = new_res_head();
-        if(parse_http_res(res_header, buf_array[fd].buffer, buf_array[fd].length))
+        if(parse_http_res(res_header, buff_array[fd].buffer, buff_array[fd].length))
         {
+                print_http_res_head(res_header);
                 /*get url from file descriptor*/
-                CacheObj_T cache_obj = find_by_url(cache, req_header->url);
+
+                CacheObj_T cache_obj = find_by_url(cache, "http://cs.tufts.edu"); /*replace "http://cs.tufts.edu" with url*/
                 assert(cache_obj == NULL);
-                cache_obj->response_buffer = NULL;
-        cache_obj->response_length = -1;
-        cache_obj->last_updated = -1;
-                /*add age to header*/
+                memcpy(cache_obj->response_buffer, buff_array[fd].buffer, buff_array[fd].length);
+                cache_obj->res_header = res_header;
+                cache_obj->response_length = buff_array[fd].length;
+                cache_obj->last_updated = time(NULL);
+
+                int final_msg_size = buff_array[fd].length;
+                char *final_msg = add_age_to_header(buff_array[fd].buffer, &final_msg_size, 0);
                 /*forward to client*/
+
+                free(final_msg);
         }
-        free_res_head(res_header);
+        else{
+                free_res_head(res_header);
+        }
+}
+
+char* add_age_to_header(char* msg, int* msg_size, int age){
+        int bytes_copied =0;
+        char input[100];
+        sprintf(input, "\r\nAge: %d", age);
+        *msg_size += strlen(input);
+        char* response = malloc(*msg_size);
+
+        char* header_end = "\r\n";
+        char* end_of_header = strstr(msg, header_end);
+        int len_first_line = end_of_header-msg;
+        
+        strncpy(response, msg, len_first_line);/*copy first line*/
+        bytes_copied += len_first_line;
+        
+        strncpy(response + bytes_copied, input, strlen(input));/*copy my line*/
+        bytes_copied += strlen(input);
+        
+        strncpy(response + bytes_copied, msg + len_first_line, *msg_size-bytes_copied); /*copy rest of msg*/
+        return response;
 }

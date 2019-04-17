@@ -35,16 +35,20 @@ CacheObj_T find_by_url(Cache_T cache, char* url)
 }
 
 
-void delete_expired(Cache_T cache, int max_age)
+void delete_expired(Cache_T cache)
 {
         Cache_T c = NULL;
         Cache_T tmp = NULL;
         int age;
         int now = time(NULL);
+        int max_age;
         HASH_ITER(hh, cache, c, tmp){
                 age = now - c->cache_obj->last_updated;
-                if(age > max_age)
-                        delete_cache_T(cache, c);
+                if(c->cache_obj->res_header){
+                        max_age = c->cache_obj->res_header->max_age;
+                        if(age > max_age)
+                                delete_cache_T(cache, c);
+                }
         }
 }
 

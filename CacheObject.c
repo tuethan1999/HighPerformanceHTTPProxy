@@ -12,6 +12,8 @@ CacheObj_T new_cache_object()
         cache_obj->response_buffer = NULL;
         cache_obj->response_length = -1;
         cache_obj->last_updated = -1;
+        cache_obj->req_header = NULL;
+        cache_obj->res_header = NULL;
         utarray_new(cache_obj->client_fds, &ut_int_icd);
         return cache_obj;
 }
@@ -36,4 +38,6 @@ void free_cache_object(CacheObj_T cache_obj)
         free(cache_obj->request_buffer);
         free(cache_obj->response_buffer);
         free(cache_obj);
+        free_req_head(cache_obj->req_header);
+        free_res_head(cache_obj->res_header);
 }

@@ -1,6 +1,8 @@
 #include <stdlib.h>
 #include "utarray.h"
 #include <time.h>
+#include "HttpReqParser.h"
+#include "HttpResParser.h"
 
 #ifndef CACHE_OBJECT_H_INCLUDED
 #define CACHE_OBJECT_H_INCLUDED
@@ -8,11 +10,13 @@
 typedef struct CacheObj_T{
         char* url;                     /*must be null_terminated*/
         
+        HttpReqHead_T req_header;
         char *request_buffer;
         int request_length; 
         time_t last_requested;
 
                                         /*response variables*/
+        HttpResHead_T res_header;
         char *response_buffer;
         int response_length;
         time_t last_updated;
