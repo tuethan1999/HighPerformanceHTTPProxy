@@ -116,6 +116,9 @@ void delete_buffer(msg_buffer *buf_array, int index);
  *
  * buf_array: the full array of partial message buffers
  * index: index of the client or server in the partial buffer array, equal to its sockfd
+ * listen_fd: the fd of the listen socket
+ * master_fd_set: fd_set variable
+ * max_sock: max value that select iterates through
  *
  *  returns: None
  */
