@@ -8,33 +8,16 @@
  * to store and query and delete
  * cache objects
  */
+#include <stdlib.h>
+#include "CacheObject.h"
 
 #ifndef HTTP_CACHE_H_INCLUDED
 #define HTTP_CACHE_H_INCLUDED
-#include <stdlib.h>
-#include "utarray.h"
-#include <time.h>
-
-typedef struct CacheObj_T{
-        char* url;                     /*must be null_terminated*/
-        
-        char *request_buffer;
-        int request_length; 
-        time_t last_requested;
-
-                                        /*response variables*/
-        char *response_buffer;
-        int response_length;
-        time_t last_accessed;
-
-        UT_array *client_fds;           /*dynamic array of sockfds who want this URL*/
-}*CacheObj_T;
 
 typedef struct Cache_T *Cache_T;
 
-
 /*
- * Function:  new_res_head 
+ * Function:  new_cache
  * --------------------
  * Allocates space for a Cache_T and returns it
  * 
