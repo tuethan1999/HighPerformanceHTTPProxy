@@ -31,6 +31,8 @@ typedef struct Serv_request{
 int SetupProxyServer(int port_number);
 Serv_request ProxyServer( int parent_fd);
 HttpReqHead_T parseClientRequest(Serv_request serv_r);
+void handleClient(Cache_T cache, msg_buffer *buffer_obj, int fd);
+void handleServer(Cache_T cache, msg_buffer *buffer_obj, int fd);
 
 
 int main(int argc, char *argv[])
@@ -51,6 +53,7 @@ int main(int argc, char *argv[])
         int max_sock = listen_fd;
 
         msg_buffer buf_array[20]; // TODO discuss size of the array
+        Cache_T cache = new_cache();
 
         //char *server_response;
         while(1){
@@ -75,6 +78,10 @@ int main(int argc, char *argv[])
                                         printf("incoming message from fd %d\n", fd);
                                         handle_incoming_message(buf_array, fd, listen_fd, &master_fd_set, &max_sock);
                                         print_partial_msg_buffer(buf_array, 20);
+                                        /*find out if server or not*/
+                                        handleClient(cache, buf_array, fd);
+                                        handleServer(cache, buf_array, fd);
+
                                 }
                         }
                 }
@@ -147,4 +154,45 @@ HttpReqHead_T parseClientRequest(Serv_request serv_r)
         HttpReqHead_T request_header = new_req_head();
         parse_http_req(request_header, serv_r->buffer, BUFFSIZE);
         return request_header;
+}
+
+void handleClient(Cache_T cache, msg_buffer* buff_array, int fd){
+        HttpReqHead_T req_header = new_req_head();
+        if(parse_http_req(req_header, buf_array[fd].buffer, buf_array[fd].length))
+        {
+                CacheObj_T cache_obj = find_by_url(cache, req_header->url);
+                if(cache_obj == NULL){ 
+                        cache_obj = new_cache_object();
+                        strcpy(cache_obj->url, req_header->url);
+                        memcpy(cache_obj->request_buffer, buf_array[fd].buffer, buf_array[fd].length);
+                        cache_obj->request_length = buf_array[fd].length;
+                        cache_obj->last_requested = time(NULL);
+                        utarray_push_back(cache_obj->client_fds, &fd);
+                        insert_into_cache(cache, cache_obj);
+                        /*forward to server*/
+                }
+                else{
+                        /*write back to client*/
+                        /*remove client from clientfd*/
+                }
+        }
+        else{
+                free_req_head(req_header);    
+        }
+}
+
+void handleServer(Cache_T cache, msg_buffer* buff_array, int fd){
+        HttpResHead_T res_header = new_res_head();
+        if(parse_http_res(res_header, buf_array[fd].buffer, buf_array[fd].length))
+        {
+                /*get url from file descriptor*/
+                CacheObj_T cache_obj = find_by_url(cache, req_header->url);
+                assert(cache_obj == NULL);
+                cache_obj->response_buffer = NULL;
+        cache_obj->response_length = -1;
+        cache_obj->last_updated = -1;
+                /*add age to header*/
+                /*forward to client*/
+        }
+        free_res_head(res_header);
 }
