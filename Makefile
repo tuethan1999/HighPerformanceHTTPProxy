@@ -13,6 +13,8 @@ all: $(EXECS)
 
 proxy: proxy.o HttpReqParser.o HttpResParser.o HttpCache.o CacheObject.o
 	$(CC) $(LDFLAGS) $^ -o $@ $(LDLIBS)
+nateproxy: nate_proxy.o HttpReqParser.o HttpResParser.o HttpCache.o CacheObject.o HandleMessage.o
+	$(CC) $(LDFLAGS) $^ -o $@ $(LDLIBS)
 
 # To get *any* .o file, compile its .c file with the following rule.
 
