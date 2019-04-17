@@ -3,7 +3,7 @@
 # 
 CC = gcc
 
-CFLAGS  = -O2 -flto -g -std=gnu99 -Wall -Wextra -Werror -pedantic
+CFLAGS  = -O2 -flto -g -std=gnu99 -Wall -Wextra -pedantic
 LDFLAGS = -g
 LDLIBS  = -O2 -lm
 
