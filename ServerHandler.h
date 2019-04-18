@@ -42,13 +42,13 @@ ServerListNode* create_server_list();
 /*
  * Function: add_node
  * --------------------
- * 
+ * Adds a node to the server list when a connection to a server is made
  *
- * server_list:
- * header:
- * sockfd:
+ * server_list: a linked list containing info on current servers
+ * header: struct containing info from a request header
+ * sockfd: fd of the new connection
  * 
- *  returns: 
+ *  returns: None
  */
  void add_node(ServerListNode **head_ptr, HttpReqHead_T header, int sockfd);
 
@@ -58,10 +58,11 @@ ServerListNode* create_server_list();
  * Removes a node from the server list
  *
  * server_list: a linked list containing info on current servers
+ * sockfd: the sockfd of the server node to be removed
  * 
  *  returns: None
  */
- void remove_list_node(ServerListNode *server_list);
+ void remove_list_node(ServerListNode *server_list, int sockfd);
 
 /*
  * Function: is_server
@@ -87,18 +88,5 @@ char *is_server(int sockfd, ServerListNode *server_list);
  *  returns: None
  */
 void print_server_list(ServerListNode *server_list);
-
-/*
- * Function: forward_request_to_server
- * --------------------
- * Forwards the request header to the server
- *	
- * sockfd: fd of the server
- * msg: char buffer to send
- * length: number of bytes in msg
- * 
- *  returns: None
- */
-void forward_request_to_server(int sockfd, char *msg, int length);
 
 #endif

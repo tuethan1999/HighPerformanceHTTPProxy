@@ -74,8 +74,27 @@ void add_node(ServerListNode **head_ptr, HttpReqHead_T header, int sockfd) {
 		}
 }
 
-void remove_list_node(ServerListNode *server_list) {
-		// TODO
+void remove_list_node(ServerListNode *server_list, int sockfd) {
+		// TODO test
+		printf("in remove_list_node, we're going to remove %d\n", sockfd);
+		ServerListNode *node = server_list;
+		ServerListNode *last;
+		while (node != NULL) {
+				printf("node's sockfd: %d\n", node->sockfd);
+				if (node->sockfd == sockfd) {
+						printf("match found!\n");
+						if (node->next != NULL) {
+								//ServerListNode *next = node->next;
+								last->next = node->next;
+								free(node);
+						}
+				}
+				else {
+						last = node;
+						node = node->next;
+				}
+		}
+		printf("sockfd not found\n");
 }
 
 char *is_server(int sockfd, ServerListNode *server_list) {
@@ -106,6 +125,3 @@ void print_server_list(ServerListNode *server_list) {
 		}
 }
 
-void forward_request_to_server(int sockfd, char *msg, int length) {
-
-}
