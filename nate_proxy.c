@@ -32,9 +32,8 @@ typedef struct Serv_request{
 int SetupProxyServer(int port_number);
 Serv_request ProxyServer( int parent_fd);
 HttpReqHead_T parseClientRequest(Serv_request serv_r);
-char* add_age_to_header(char* msg, int* msg_size, int age);
-void handleClient(Cache_T cache, msg_buffer *buffer_obj, int fd, ServerListNode **server_list, fd_set *master_fd_set, int *max_sock);
-void handleServer(Cache_T cache, msg_buffer *buffer_obj, int fd, char *url);
+void handleClient(Cache_T cache, msg_buffer *buffer_obj, int fd, ServerListNode *server_list);
+void handleServer(Cache_T cache, msg_buffer *buffer_obj, int fd);
 
 
 int main(int argc, char *argv[])
@@ -54,10 +53,9 @@ int main(int argc, char *argv[])
         FD_SET(listen_fd, &master_fd_set);
         int max_sock = listen_fd;
 
-        msg_buffer buff_array[20]; // TODO discuss size of the array
+        msg_buffer buf_array[20]; // TODO discuss size of the array
         Cache_T cache = new_cache();
-       //ServerListNode *server_list = create_server_list();
-        ServerListNode *server_list = NULL;
+        ServerListNode *server_list = create_server_list();
 
         //char *server_response;
         while(1){
@@ -75,28 +73,27 @@ int main(int argc, char *argv[])
                 else if (rv == 0) {
                         // TODO implement timeout
                         printf("timeout\n");
-                        //print_partial_msg_buffer(buff_array, 20);
                 }
                 else {
                         for (int fd = 0; fd < max_sock+1; fd++) {
                                 if (FD_ISSET(fd, &copy_fd_set)) {
                                         printf("incoming message from fd %d\n", fd);
-                                        handle_incoming_message(buff_array, fd, listen_fd, &master_fd_set, &max_sock);
-                                        print_partial_msg_buffer(buff_array, 20);
+                                        handle_incoming_message(buf_array, fd, listen_fd, &master_fd_set, &max_sock);
+                                        //print_partial_msg_buffer(buf_array, 20);
                                         char *url = is_server(fd, server_list);
                                         if (url == NULL) {
-                                                printf("to handleClient\n");
-                                                handleClient(cache, buff_array, fd, &server_list, &master_fd_set, &max_sock);
+                                                printf("message from client\n");
+                                                handleClient(cache, buf_array, fd, server_list);
                                         }
                                         else {
-                                                printf("to handleServer\n");
-                                                handleServer(cache, buff_array, fd, url);
+                                                printf("message from server\n");
+                                                handleServer(cache, buf_array, fd);
                                         }
 
                                 }
                         }
                 }
-                delete_expired(cache);
+
                 //Serv_request serv_r = ProxyServer(listen_fd);
                 //HttpReqHead_T req_h = parseClientRequest(serv_r);
                 //print_http_req_head(req_h);
@@ -167,50 +164,26 @@ HttpReqHead_T parseClientRequest(Serv_request serv_r)
         return request_header;
 }
 
-void handleClient(Cache_T cache, msg_buffer* buff_array, int fd, ServerListNode **server_list, fd_set *master_fd_set, int *max_sock){
+void handleClient(Cache_T cache, msg_buffer* buf_array, int fd, ServerListNode *server_list){
+        printf("in handleClient\n");
         HttpReqHead_T req_header = new_req_head();
-        if(parse_http_req(req_header, buff_array[fd].buffer, buff_array[fd].length))
+        if(parse_http_req(req_header, buf_array[fd].buffer, buf_array[fd].length))
         {
-                print_http_req_head(req_header);
                 CacheObj_T cache_obj = find_by_url(cache, req_header->url);
-                if(cache_obj == NULL){
-                        printf("doesn't exist in cache\n");
+                if(cache_obj == NULL){ 
                         cache_obj = new_cache_object();
-                        cache_obj->req_header = req_header;
-                        cache_obj->url = malloc(strlen(req_header->url) + 1);
-                        strncpy(cache_obj->url, req_header->url, strlen(req_header->url));
-                        cache_obj->request_buffer = malloc(buff_array[fd].length);
-                        memcpy(cache_obj->request_buffer, buff_array[fd].buffer, buff_array[fd].length);
-                        cache_obj->request_length = buff_array[fd].length;
+                        strcpy(cache_obj->url, req_header->url);
+                        memcpy(cache_obj->request_buffer, buf_array[fd].buffer, buf_array[fd].length);
+                        cache_obj->request_length = buf_array[fd].length;
                         cache_obj->last_requested = time(NULL);
                         utarray_push_back(cache_obj->client_fds, &fd);
                         insert_into_cache(cache, cache_obj);
-                        clear_buffer(buff_array, fd);
-                        int serv_fd = initiate_server_connection(req_header, server_list);
-                        FD_SET(serv_fd, master_fd_set);
-                        *max_sock = serv_fd;
-                        int n = write(serv_fd, cache_obj->request_buffer, cache_obj->request_length);
-                        if (n < 0)
-                                error("ERROR writing to socket");
-                        printf("wrote %d bytes to server\n", n);
-
-                        /*char buffer[BUFFSIZE];
-                        bzero(buffer, BUFFSIZE);
-                        n = read(serv_fd, buffer, BUFFSIZE);
-                        if (n < 0)
-                                error("ERROR reading from socket");
-                        printf("read %d bytes\n", n);
-                        for (int i = 0; i < n; i++)
-                                printf("%c", buffer[i]);*/
-
+                        printf("about to enter inititate_server_connection\n");
+                        int serv_fd = inititate_server_connection(req_header, server_list);
                 }
                 else{
-                        cache_obj->last_requested = time(NULL);
-                        int final_msg_size = buff_array[fd].length;
-                        char *final_msg = add_age_to_header(buff_array[fd].buffer, &final_msg_size, 0);
-                        free(final_msg);
                         /*write back to client*/
-                        delete_from_clientfds(cache_obj, fd);
+                        /*remove client from clientfd*/
                 }
         }
         else{
@@ -218,49 +191,18 @@ void handleClient(Cache_T cache, msg_buffer* buff_array, int fd, ServerListNode 
         }
 }
 
-void handleServer(Cache_T cache, msg_buffer* buff_array, int fd, char* url){
+/*void handleServer(Cache_T cache, msg_buffer* buf_array, int fd){
         HttpResHead_T res_header = new_res_head();
-        if(parse_http_res(res_header, buff_array[fd].buffer, buff_array[fd].length))
+        if(parse_http_res(res_header, buf_array[fd].buffer, buf_array[fd].length))
         {
-                print_http_res_head(res_header);
-                printf("out of print_http_res_head\n");
-                /*get url from file descriptor*/
-
-                CacheObj_T cache_obj = find_by_url(cache, url); /*replace "http://cs.tufts.edu" with url*/
+                /*get url from file descriptor
+                CacheObj_T cache_obj = find_by_url(cache, req_header->url);
                 assert(cache_obj == NULL);
-                memcpy(cache_obj->response_buffer, buff_array[fd].buffer, buff_array[fd].length);
-                cache_obj->res_header = res_header;
-                cache_obj->response_length = buff_array[fd].length;
-                cache_obj->last_updated = time(NULL);
-
-                int final_msg_size = buff_array[fd].length;
-                char *final_msg = add_age_to_header(buff_array[fd].buffer, &final_msg_size, 0);
-                /*forward to client*/
-
-                free(final_msg);
+                cache_obj->response_buffer = NULL;
+        cache_obj->response_length = -1;
+        cache_obj->last_updated = -1;
+                /*add age to header*/
+                /*forward to client*
         }
-        else{
-                free_res_head(res_header);
-        }
-}
-
-char* add_age_to_header(char* msg, int* msg_size, int age){
-        int bytes_copied =0;
-        char input[100];
-        sprintf(input, "\r\nAge: %d", age);
-        *msg_size += strlen(input);
-        char* response = malloc(*msg_size);
-
-        char* header_end = "\r\n";
-        char* end_of_header = strstr(msg, header_end);
-        int len_first_line = end_of_header-msg;
-        
-        strncpy(response, msg, len_first_line);/*copy first line*/
-        bytes_copied += len_first_line;
-        
-        strncpy(response + bytes_copied, input, strlen(input));/*copy my line*/
-        bytes_copied += strlen(input);
-        
-        strncpy(response + bytes_copied, msg + len_first_line, *msg_size-bytes_copied); /*copy rest of msg*/
-        return response;
-}
+        free_res_head(res_header);
+}*/

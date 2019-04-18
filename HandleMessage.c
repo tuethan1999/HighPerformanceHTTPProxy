@@ -12,14 +12,14 @@ void error(const char *msg) {
 		exit(1);}
 
 void initialize_partial_msg_buffer(msg_buffer *buf_array, int index) {
-		printf("in initialize_partial_msg_buffer\n");
+		//printf("in initialize_partial_msg_buffer\n");
 		buf_array[index].buffer = malloc(BUFFSIZE);
 		buf_array[index].size = BUFFSIZE;
 		buf_array[index].length = 0;
 }
 
 void increase_buffer_size(msg_buffer *buf_array, int index) {
-		printf("in increase_buffer_size\n");
+		//printf("in increase_buffer_size\n");
 		char *new_buf = malloc(2*buf_array[index].size);
 		strncpy(new_buf, buf_array[index].buffer, buf_array[index].length);
 		free(buf_array[index].buffer);
@@ -28,11 +28,10 @@ void increase_buffer_size(msg_buffer *buf_array, int index) {
 }
 
 void add_to_partial_msg_buffer(char *msg, msg_buffer *buf_array, int index, int length) {
-		printf("in add_to_partial_msg_buffer\n");
-		printf("length = %d\n", length);
-		printf("current buffer size = %d\ncurrent buffer length = %d\n", buf_array[index].size, buf_array[index].length);
+		//printf("in add_to_partial_msg_buffer\n");
+		//printf("current buffer size = %d\ncurrent buffer length = %d\n", buf_array[index].size, buf_array[index].length);
 		if (length >= buf_array[index].size - buf_array[index].length) {
-				printf("do we make it to this point\n");
+				printf("must increase buffer size\n");
 				increase_buffer_size(buf_array, index);
 		}
 		int position = buf_array[index].length;
@@ -41,7 +40,7 @@ void add_to_partial_msg_buffer(char *msg, msg_buffer *buf_array, int index, int 
 }
 
 void print_partial_msg_buffer(msg_buffer *buf_array, int length) {
-		printf("print_partial_msg_buffer:\n");
+		//printf("print_partial_msg_buffer:\n");
 		for (int i = 0; i < length; i++) {
 				printf("sockfd: %d\n", i);
 				for (int j = 0; j < buf_array[i].length; j++) {

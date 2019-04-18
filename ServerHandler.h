@@ -37,7 +37,7 @@ ServerListNode* create_server_list();
  * 
  *  returns: the file descriptor of the new connection
  */
- int initiate_server_connection(HttpReqHead_T header, ServerListNode *server_list);
+ int initiate_server_connection(HttpReqHead_T header, ServerListNode **server_list);
 
 /*
  * Function: add_node
@@ -50,7 +50,7 @@ ServerListNode* create_server_list();
  * 
  *  returns: 
  */
- void add_node(ServerListNode *server_list, HttpReqHead_T header, int sockfd);
+ void add_node(ServerListNode **head_ptr, HttpReqHead_T header, int sockfd);
 
 /*
  * Function: remove_list_node
