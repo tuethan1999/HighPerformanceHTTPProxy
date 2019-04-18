@@ -50,7 +50,8 @@ void print_partial_msg_buffer(msg_buffer *buf_array, int length) {
 }
 
 void clear_buffer(msg_buffer *buf_array, int index) {
-		bzero(buf_array[index].buffer, MAX_LENGTH);
+		if (buf_array[index].buffer != NULL)
+				bzero(buf_array[index].buffer, MAX_LENGTH);
 }
 
 void clear_header_from_buffer(msg_buffer *buf_array, int index, int header_length) {
@@ -61,7 +62,8 @@ void clear_header_from_buffer(msg_buffer *buf_array, int index, int header_lengt
 }
 
 void delete_buffer(msg_buffer *buf_array, int index) {
-		free(buf_array[index].buffer);
+		if (buf_array[index].buffer != NULL)
+				free(buf_array[index].buffer);
 		buf_array[index].length = 0;
 		buf_array[index].size = 0;
 }
