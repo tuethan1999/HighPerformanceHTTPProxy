@@ -8,20 +8,19 @@
 #define CACHE_OBJECT_H_INCLUDED
 
 typedef struct CacheObj_T{
-        char* url;                     /*must be null_terminated*/
+        char* url;/*must be null_terminated*/
         
         HttpReqHead_T req_header;
         char *request_buffer;
         int request_length; 
         time_t last_requested;
 
-                                        /*response variables*/
         HttpResHead_T res_header;
         char *response_buffer;
         int response_length;
         time_t last_updated;
 
-        UT_array *client_fds;           /*dynamic array of sockfds who want this URL*/
+        UT_array *client_fds;/*dynamic array of sockfds who want this URL*/
 }*CacheObj_T;
 
 
@@ -35,6 +34,18 @@ typedef struct CacheObj_T{
 CacheObj_T new_cache_object();
 
 /*
+ * Function:  is_expired
+ * --------------------
+ * checks if a CacheObj_T's age is greater than or equal to the max age
+ * 
+ *  cache_obj: CacheObj_T to check
+ *  
+ *  returns: 1 if CacheObj_T's age is greater than or equal to the max age
+ *           0 else
+ */
+int is_expired(CacheObj_T cache_obj);
+
+/*
  * Function:  delete_from_clientfds
  * --------------------
  * Deletes a sockfd from list of clientfds
@@ -45,6 +56,18 @@ CacheObj_T new_cache_object();
  *  returns: None
  */
 void delete_from_clientfds(CacheObj_T cache_obj, int sockfd);
+
+
+/*
+ * Function:  print_cache_object
+ * --------------------
+ * prints CacheObj_T
+ * 
+ *  cache_obj: CacheObj_T to print
+ *  
+ *  returns: None
+ */
+void print_cache_object(CacheObj_T cache_obj);
 
 /*
  * Function:  free_cache_object

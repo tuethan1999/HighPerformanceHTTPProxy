@@ -7,15 +7,14 @@ CFLAGS  = -O2 -flto -g -std=gnu99 -Wall -Wextra -pedantic
 LDFLAGS = -g
 LDLIBS  = -O2 -lm
 
-EXECS   = proxy clean nateproxy
+EXECS   = proxy cache clean
 
 all: $(EXECS)
 
-proxy: proxy.o HttpReqParser.o HttpResParser.o HttpCache.o CacheObject.o HandleMessage.o ServerHandler.o
+proxy: proxy.o HttpReqParser.o HttpResParser.o HttpCache.o CacheObject.o
 	$(CC) $(LDFLAGS) $^ -o $@ $(LDLIBS)
-nateproxy: nate_proxy.o HttpReqParser.o HttpResParser.o HttpCache.o CacheObject.o HandleMessage.o
+cache: cache_tests.o HttpCache.o CacheObject.o
 	$(CC) $(LDFLAGS) $^ -o $@ $(LDLIBS)
-
 # To get *any* .o file, compile its .c file with the following rule.
 
 INCLUDES = $(shell echo *.h)

@@ -1,71 +1,99 @@
 #include "HttpCache.h"
-#include "uthash.h"
 #include <assert.h>
+#include <stdio.h>
 
+#define INITIAL_CACHE_SIZE 1
 struct Cache_T{
-        CacheObj_T cache_obj;
-        UT_hash_handle hh; /* makes this structure hashable */
+        CacheObj_T *arr;
+        int num_obj;
+        int capacity;
 };
-
-void delete_cache_T(Cache_T cache, Cache_T c){
-        HASH_DEL(cache, c);
-        free_cache_object(c->cache_obj);
-        free(c);
-}
 
 Cache_T new_cache()
 {
-        Cache_T cache = NULL;
+        Cache_T cache = malloc(sizeof(*cache));
+        assert(cache != NULL);
+        cache->arr = malloc(INITIAL_CACHE_SIZE * sizeof(CacheObj_T));
+        memset(cache->arr, 0, INITIAL_CACHE_SIZE * sizeof(CacheObj_T));
+        assert(cache->arr != NULL);
+        cache->num_obj = 0;
+        cache->capacity = INITIAL_CACHE_SIZE;
         return cache;
 }
 
 void insert_into_cache(Cache_T cache, CacheObj_T obj)
 {
-        Cache_T c = malloc(sizeof(*c));
-        c->cache_obj = obj;
-        HASH_ADD_KEYPTR(hh, cache, c->cache_obj->url, strlen(c->cache_obj->url), c);
+        if(cache->num_obj >= cache->capacity){
+                int new_size = 2*cache->capacity;
+                int new_size_bytes = new_size * sizeof(CacheObj_T);
+                int old_size_bytes = cache->capacity * sizeof(CacheObj_T);
+                fprintf(stderr, "Cache full, expanding buffer list size from %d -> %d\n", cache->capacity, new_size);
+                CacheObj_T *new_list = malloc(new_size_bytes);
+                memset(new_list, 0, new_size_bytes);
+                memcpy(new_list, cache->arr, old_size_bytes);
+                free(cache->arr);
+                cache->arr = new_list;
+                cache->capacity = new_size;
+        }
+        for(int i = 0; i < cache->capacity; i++){
+                if (cache->arr[i] == NULL){
+                        cache->arr[i] = obj;
+                        cache->num_obj+=1;
+                        break;
+                }
+        }
 }
 
 CacheObj_T find_by_url(Cache_T cache, char* url)
 {
-        Cache_T c = NULL;
-        HASH_FIND_STR(cache, url, c);
-        if(c) return c->cache_obj;
+        for(int i = 0; i < cache->capacity; i++){
+                if(cache->arr[i] == NULL)
+                        continue;
+                if(strcmp(cache->arr[i]->url, url) == 0){
+                        return cache->arr[i];
+                }
+        }
         return NULL;
+}
+
+void print_cache(Cache_T cache)
+{
+        fprintf(stderr, "%s\n", "******************************PRINTING CACHE******************************");
+        for(int i = 0; i < cache->capacity; i++){
+                if(cache->arr[i] == NULL)
+                        continue;
+                print_cache_object(cache->arr[i]);
+        }
+        fprintf(stderr, "%s\n", "***************************************************************************");
 }
 
 
 void delete_expired(Cache_T cache)
 {
-        Cache_T c = NULL;
-        Cache_T tmp = NULL;
-        int age;
-        int now = time(NULL);
-        int max_age;
-        HASH_ITER(hh, cache, c, tmp){
-                age = now - c->cache_obj->last_updated;
-                if(c->cache_obj->res_header){
-                        max_age = c->cache_obj->res_header->max_age;
-                        if(age > max_age)
-                                delete_cache_T(cache, c);
+        fprintf(stderr, "%s\n", "checking expired");
+        for(int i = 0; i < cache->capacity; i++){
+                CacheObj_T cache_obj = cache->arr[i];
+                if(cache_obj == NULL || cache_obj->res_header == NULL || cache_obj->last_updated == -1)
+                        continue;
+                if(is_expired(cache_obj)){
+                        fprintf(stderr, "deleting %s from cache\n", cache_obj->url);
+                        free_cache_object(cache_obj);
+                        cache->arr[i] = NULL;
                 }
         }
 }
 
 void delete_by_sockfd(Cache_T cache, int sockfd)
 {
-        Cache_T c = NULL;
-        Cache_T tmp = NULL;
-        HASH_ITER(hh, cache, c, tmp){
-                delete_from_clientfds(c->cache_obj, sockfd);
-        }
-}
+        return;
+}       
 
 void free_cache(Cache_T cache)
 {
-        Cache_T c = NULL;
-        Cache_T tmp = NULL;
-        HASH_ITER(hh, cache, c, tmp){
-                delete_cache_T(cache, c);
+        for(int i = 0; i < cache->capacity; i++){
+                if(cache->arr[i] == NULL)
+                        continue;
+                free_cache_object(cache->arr[i]);
         }
+        free(cache);
 }

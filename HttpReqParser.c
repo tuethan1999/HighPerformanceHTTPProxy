@@ -17,7 +17,7 @@
 
 
 #ifndef FIELD_NAME_LENGTH
-        #define FIELD_NAME_LENGTH 10
+        #define FIELD_NAME_LENGTH 20
 #endif
 #ifndef CONTENT_LENGTH
         #define CONTENT_LENGTH 20

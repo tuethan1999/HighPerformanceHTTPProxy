@@ -76,6 +76,17 @@ void delete_expired(Cache_T cache);
 void delete_by_sockfd(Cache_T cache, int sockfd);
 
 /*
+ * Function:  print_cache
+ * --------------------
+ * print every CacheObj_T in the cache 
+ *
+ *  cache: Cache_T to print
+ *
+ *  returns: None
+ */
+void print_cache(Cache_T cache);
+
+/*
  * Function:  free_cache
  * --------------------
  * Frees memory allocated for Cache_T

@@ -1,5 +1,13 @@
 #include "CacheObject.h"
 #include <assert.h>
+#include <stdio.h>
+
+#ifndef FIELD_NAME_LENGTH
+        #define FIELD_NAME_LENGTH 20
+#endif
+#ifndef CONTENT_LENGTH
+        #define CONTENT_LENGTH 20
+#endif
 
 CacheObj_T new_cache_object()
 {
@@ -29,6 +37,27 @@ void delete_from_clientfds(CacheObj_T cache_obj, int sockfd)
                 }
                 i++;
         }
+}
+
+int is_expired(CacheObj_T cache_obj){
+        print_cache_object(cache_obj);
+        fprintf(stderr, "age: %d, max_age: %d\n", (int)(time(NULL) - cache_obj->last_updated), (int)cache_obj->res_header->max_age);
+        if ((time(NULL) - cache_obj->last_updated) >= cache_obj->res_header->max_age)
+                return 1;
+        return 0;
+}
+
+void print_cache_object(CacheObj_T cache_obj)
+{
+        printf("--------------------------------\n");
+        printf("%*s: %*s\n", FIELD_NAME_LENGTH, "Url", CONTENT_LENGTH, cache_obj->url);
+        printf("%*s: %*d\n", FIELD_NAME_LENGTH, "Last Requested", CONTENT_LENGTH, (int)cache_obj->last_requested);
+        printf("%*s: %*d\n", FIELD_NAME_LENGTH, "Last Updated", CONTENT_LENGTH, (int)cache_obj->last_updated);
+        printf("%*s: %*d\n", FIELD_NAME_LENGTH, "Request Length", CONTENT_LENGTH, cache_obj->request_length);
+        printf("%*s: %*d\n", FIELD_NAME_LENGTH, "Response Length", CONTENT_LENGTH, cache_obj->response_length);
+        if(cache_obj->res_header) print_http_res_head(cache_obj->res_header);
+        if(cache_obj->req_header) print_http_req_head(cache_obj->req_header);
+        printf("--------------------------------\n");
 }
 
 void free_cache_object(CacheObj_T cache_obj)

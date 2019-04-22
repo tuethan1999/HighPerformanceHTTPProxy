@@ -16,7 +16,7 @@
 #include <string.h>
 
 #ifndef FIELD_NAME_LENGTH
-        #define FIELD_NAME_LENGTH 10
+        #define FIELD_NAME_LENGTH 20
 #endif
 #ifndef CONTENT_LENGTH
         #define CONTENT_LENGTH 20
@@ -24,6 +24,14 @@
 #ifndef DEFAULT_MAX_AGE
         #define DEFAULT_MAX_AGE 60
 #endif
+#ifndef MAX_HEADER_SIZE
+        #define MAX_HEADER_SIZE 16000
+#endif
+#ifndef MIN
+        #define MIN( a, b ) ( ((a) < (b)) ? (a) : (b) )
+#endif
+
+
 
 HttpResHead_T new_res_head()
 {
@@ -38,7 +46,7 @@ HttpResHead_T new_res_head()
 
 int parse_http_res(HttpResHead_T header, char* buffer, int buffer_size)
 {
-        /* copy buffer and make it null terminated*/
+        buffer_size = MIN(buffer_size, MAX_HEADER_SIZE);
         char buf_string[buffer_size + 1];
         memset(buf_string, 0, buffer_size + 1);
         strncpy(buf_string, buffer, buffer_size);
