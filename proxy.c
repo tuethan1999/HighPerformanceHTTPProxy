@@ -25,6 +25,24 @@ void server_error(char *msg) {
         perror(msg);
         exit(EXIT_FAILURE);
 }
+
+/*************************************************************************************************************************************/
+typedef struct secureNode {
+        int client_fd;
+        int server_fd;
+}*secureNode_ptr;
+secureNode_ptr newSecureNode(int client, int server);
+/*************************************************************************************************************************************/
+typedef struct secureNodeList {
+        secureNode_ptr *nodes;
+        int size;
+        int length;
+}*secureNodeList;
+secureNodeList newSecureNodeList();
+void insertSecureNode(secureNodeList node_list, secureNode_ptr node);
+void deleteSecureNode(secureNodeList node_list, int index);
+int findNodeBySockfd(secureNodeList node_list, int sockfd);
+void printSecureNodeList(secureNodeList node_list);
 /*************************************************************************************************************************************/
 typedef struct serverNode {
         int fd;
@@ -53,18 +71,21 @@ typedef struct bufferListStruct{
 bufferList newBufferList();
 void insertBufferList(bufferList buffer_list, partialBuffer_ptr partial_buffer, int index);
 void deleteFromBufferList(bufferList buffer_list, int index);
+void clearFromBufferList(bufferList buffer_list, int index);
 void printBufferList(bufferList buffer_list);
 /*************************************************************************************************************************************/
 int setupListenSocket(int port_number);
 int setupServerSocket(HttpReqHead_T header);
 void handleNewConnection(int fd, fd_set *master_fd_set, bufferList buffer_list, int *max_sock_ptr);
-int handleExistingConnection(int fd, fd_set *master_fd_set, int *max_sock_ptr, bufferList buffer_list, Cache_T cache, serverNode_ptr *server_list);
+int handleExistingConnection(int fd, fd_set *master_fd_set, int *max_sock_ptr, bufferList buffer_list, Cache_T cache, serverNode_ptr *server_list, secureNodeList secure_list);
 void handleDisconnect(int fd, fd_set *master_fd_set, bufferList buffer_list, int *max_sock_ptr);
-void handleClient(int fd, fd_set *master_fd_set, int *max_sock_ptr, bufferList buffer_list, Cache_T cache, serverNode_ptr *server_list);
-void handleServer(int fd, bufferList buffer_list, Cache_T cache, char* url);
+void handleClient(int fd, fd_set *master_fd_set, int *max_sock_ptr, bufferList buffer_list, Cache_T cache, serverNode_ptr *server_list, secureNodeList secure_list);
+void handleServer(int fd, bufferList buffer_list, Cache_T cache, char* url, secureNodeList secure_list);
 /*************************************************************************************************************************************/
 char* headerWithAge(char* msg, int* msg_size, int age);
+void sendConnectionEstablishedHeader(int serv_fd);
 /*************************************************************************************************************************************/
+
 
 int main(int argc, char *argv[])
 {
@@ -84,6 +105,7 @@ int main(int argc, char *argv[])
         Cache_T cache = new_cache();
         serverNode_ptr server_list = NULL;
         bufferList buffer_list = newBufferList();
+        secureNodeList secure_list = newSecureNodeList();
         int max_sock = listen_fd;
 
         while(1){        
@@ -107,7 +129,7 @@ int main(int argc, char *argv[])
                                 if (fd == listen_fd){
                                         handleNewConnection(fd, &master_fd_set, buffer_list, &max_sock);
                                 }
-                                else if(!handleExistingConnection(fd, &master_fd_set, &max_sock, buffer_list, cache, &server_list)){
+                                else if(!handleExistingConnection(fd, &master_fd_set, &max_sock, buffer_list, cache, &server_list, secure_list)){
                                         handleDisconnect(fd, &master_fd_set, buffer_list, &max_sock);
                                 }
                         }
@@ -191,7 +213,7 @@ void handleNewConnection(int fd, fd_set* master_fd_set, bufferList buffer_list, 
         insertBufferList(buffer_list, new_partial_buffer, new_fd);
 }
 
-int handleExistingConnection(int fd, fd_set *master_fd_set, int *max_sock_ptr, bufferList buffer_list, Cache_T cache, serverNode_ptr *server_list)
+int handleExistingConnection(int fd, fd_set *master_fd_set, int *max_sock_ptr, bufferList buffer_list, Cache_T cache, serverNode_ptr *server_list, secureNodeList secure_list)
 {
         fprintf(stderr, "Message incoming on existing fd %d\n", fd);
         char *buffer = malloc(sizeof(char)* BUFSIZE);
@@ -205,14 +227,15 @@ int handleExistingConnection(int fd, fd_set *master_fd_set, int *max_sock_ptr, b
                 return 0;
         }
         else {
-                fprintf(stderr, "Read %d bytes from fd %d\n", n, fd);
+                fprintf(stderr, "Read %d bytes from fd %d:\n", n, fd);
                 insertPartialBuffer(buffer_list->buffers[fd], buffer, n);
+                printf("successfully added to partial message buffer\n");
                 char *url = isServer(*server_list, fd);
                 if(url){
-                        handleServer(fd, buffer_list, cache, url);
+                        handleServer(fd, buffer_list, cache, url, secure_list);
                 }
                 else{
-                        handleClient(fd, master_fd_set, max_sock_ptr, buffer_list, cache, server_list);
+                        handleClient(fd, master_fd_set, max_sock_ptr, buffer_list, cache, server_list, secure_list);
                 }
         }
         free(buffer);
@@ -229,10 +252,11 @@ void handleDisconnect(int fd, fd_set* master_fd_set, bufferList buffer_list, int
         FD_CLR(fd, master_fd_set);
 }
 
-void handleClient(int fd, fd_set *master_fd_set, int *max_sock_ptr, bufferList buffer_list, Cache_T cache, serverNode_ptr *server_list)
+void handleClient(int fd, fd_set *master_fd_set, int *max_sock_ptr, bufferList buffer_list, Cache_T cache, serverNode_ptr *server_list, secureNodeList secure_list)
 {
         HttpReqHead_T req_header = new_req_head();
         partialBuffer_ptr partial_buffer = buffer_list->buffers[fd];
+        printf("attemping to parse buffer, might break things\n");
         if(parse_http_req(req_header, partial_buffer->buffer, partial_buffer->length))
         {
                 fprintf(stderr, "fd %d has a complete header\n", fd);
@@ -268,11 +292,26 @@ void handleClient(int fd, fd_set *master_fd_set, int *max_sock_ptr, bufferList b
                         partialBuffer_ptr new_partial_buffer =  newPartialBuffer();
                         insertBufferList(buffer_list, new_partial_buffer, serv_fd);
 
+                        printf("req_header->method = %s\n", req_header->method);
+
                         /*write to server*/
-                        int n = write(serv_fd, cache_obj->request_buffer, cache_obj->request_length);
-                        if (n < 0)
-                                server_error("ERROR writing to server");
-                        fprintf(stderr, "wrote %d bytes to server\n", n);
+                        if (strcmp(req_header->method, "GET") == 0) {
+                                printf("writing this to the server:\n");
+                                for (int i = 0; i < cache_obj->request_length; i++) {
+                                        printf("%c", cache_obj->request_buffer[i]);
+                                }
+                                int n = write(serv_fd, cache_obj->request_buffer, cache_obj->request_length);
+                                if (n < 0)
+                                        server_error("ERROR writing to server");
+                                fprintf(stderr, "wrote %d bytes to server\n", n);
+                        }
+                        else if (strcmp(req_header->method, "CONNECT") == 0) {
+                                printf("CONNECT request received\nsending confirmation back to client\n");
+                                sendConnectionEstablishedHeader(fd);
+                                secureNode_ptr node = newSecureNode(fd, serv_fd);
+                                insertSecureNode(secure_list, node);
+                                printSecureNodeList(secure_list);
+                        }
                 }
                 else if(cache_obj->last_updated != -1 && !is_expired(cache_obj)){
                         fprintf(stderr, "%s\n", "Valid response in cache");
@@ -292,11 +331,20 @@ void handleClient(int fd, fd_set *master_fd_set, int *max_sock_ptr, bufferList b
                 else{
                         fprintf(stderr, "%s\n", "Invalid response in cache");
                 }
-                deleteFromBufferList(buffer_list, fd);
+                clearFromBufferList(buffer_list, fd);
+        }
+        else if (findNodeBySockfd(secure_list, fd) > 0) {
+                int dest_fd = findNodeBySockfd(secure_list, fd);
+                printf("Tunneling data from fd %d to fd %d\n", fd, dest_fd);
+                int n = write(dest_fd, partial_buffer->buffer, partial_buffer->length);
+                if (n < 0)
+                        server_error("ERROR tunneling data");
+                printf("Tunneled %d bytes from fd %d to fd %d\n", n, fd, dest_fd);
+                clearFromBufferList(buffer_list, fd);
         }
 }
 
-void handleServer(int fd, bufferList buffer_list, Cache_T cache, char* url){
+void handleServer(int fd, bufferList buffer_list, Cache_T cache, char* url, secureNodeList secure_list){
         HttpResHead_T res_header = new_res_head();
         partialBuffer_ptr partial_buffer = buffer_list->buffers[fd];
         int complete_header = parse_http_res(res_header, partial_buffer->buffer, partial_buffer->length);
@@ -323,6 +371,15 @@ void handleServer(int fd, bufferList buffer_list, Cache_T cache, char* url){
                         printf("wrote %d bytes to fd %d\n", n, *p);
                 }
                 free(final_msg);
+        }
+        else if (findNodeBySockfd(secure_list, fd) > 0) {
+                int dest_fd = findNodeBySockfd(secure_list, fd);
+                printf("Tunneling data from fd %d to fd %d\n", fd, dest_fd);
+                int n = write(dest_fd, partial_buffer->buffer, partial_buffer->length);
+                if (n < 0)
+                        server_error("ERROR tunneling data");
+                printf("Tunneled %d bytes from fd %d to fd %d\n", n, fd, dest_fd);
+                clearFromBufferList(buffer_list, fd);
         }
 }
 /*************************************************************************************************************************************/
@@ -402,6 +459,7 @@ partialBuffer_ptr newPartialBuffer()
 
 void insertPartialBuffer(partialBuffer_ptr partial_buffer, char* msg, int length)
 {
+        printf("in insertPartialBuffer\n");
         if (length >= partial_buffer->size - partial_buffer->length) {
                 int new_size = 2*partial_buffer->size;
                 fprintf(stderr, "length of msg is %d, expanding partial buffer size from %d -> %d\n", length, partial_buffer->size, new_size);
@@ -477,6 +535,14 @@ void deleteFromBufferList(bufferList buffer_list, int index)
         buffer_list->buffers[index] = NULL;
 }
 
+void clearFromBufferList(bufferList buffer_list, int index) {
+        fprintf(stderr, "clearing buffer of fd: %d\n", index);
+        partialBuffer_ptr partial_buffer =  buffer_list->buffers[index];
+        deletePartialBuffer(partial_buffer);
+        partialBuffer_ptr new_partial_buffer =  newPartialBuffer();
+        insertBufferList(buffer_list, new_partial_buffer, index);
+}
+
 void printBufferList(bufferList buffer_list)
 {       
         fprintf(stderr, "%s\n", "printing buffer list");
@@ -513,4 +579,84 @@ char* headerWithAge(char* msg, int* msg_size, int age){
         
         strncpy(response + bytes_copied, msg + len_first_line, *msg_size-bytes_copied); /*copy rest of msg*/
         return response;
+}
+
+void sendConnectionEstablishedHeader(int cli_fd) {
+        //"HTTP/1.1 200 Connection Established\r\nConnection: close\r\n\r\n"
+        char *header = "HTTP/1.1 200 Connection Established\r\n\r\n";
+        int n = write(cli_fd, header, strlen(header)+4);
+        if (n < 0)
+                server_error("ERROR writing to client");
+}
+/*************************************************************************************************************************************/
+/*************************************************************************************************************************************/
+/*************************************************************************************************************************************/
+/*************************************************************************************************************************************/
+/*************************************************************************************************************************************/
+/*************************************************************************************************************************************/
+/*************************************************************************************************************************************/
+
+secureNode_ptr newSecureNode(int client, int server) {
+        secureNode_ptr node = malloc(sizeof(*node));
+        if (node == NULL) server_error("create secureNode_ptr");
+        node->client_fd = client;
+        node->server_fd = server;
+        return node;
+}
+/*************************************************************************************************************************************/
+/*************************************************************************************************************************************/
+/*************************************************************************************************************************************/
+/*************************************************************************************************************************************/
+/*************************************************************************************************************************************/
+/*************************************************************************************************************************************/
+/*************************************************************************************************************************************/
+
+secureNodeList newSecureNodeList() {
+        secureNodeList list = malloc(sizeof(*list));
+        if (list == NULL) server_error("create secureNodeList");
+        list->nodes = malloc(sizeof(secureNode_ptr));
+        memset(list->nodes, 0, sizeof(secureNode_ptr));
+        if (list->nodes == NULL) server_error("create secureNodeList nodes");
+        list->size = 1;
+        list->length = 0;
+        return list;
+}
+
+void insertSecureNode(secureNodeList node_list, secureNode_ptr node) {
+        printf("in insertPartialBuffer\n");
+        while ((node_list->size - node_list->length) <= 0) {
+                int new_size = 2*node_list->size;
+                int new_size_bytes = new_size * sizeof(secureNode_ptr);
+                int old_size_bytes = node_list->size * sizeof(secureNode_ptr);
+                fprintf(stderr, "expanding secure node list size from %d -> %d\n", node_list->size, new_size);
+                secureNode_ptr *new_list = malloc(new_size_bytes);
+                memset(new_list, 0, new_size_bytes);
+                memcpy(new_list, node_list->nodes, old_size_bytes);
+                free(node_list->nodes);
+                node_list->nodes = new_list;
+                node_list->size = new_size;
+        }
+        node_list->nodes[node_list->length] = node;
+        node_list->length++;
+}
+
+void deleteSecureNode(secureNodeList node_list, int index) {
+        // TODO
+}
+
+int findNodeBySockfd(secureNodeList node_list, int sockfd) {
+        for (int i = 0; i < node_list->length; i++) {
+                if (sockfd == node_list->nodes[i]->server_fd)
+                        return node_list->nodes[i]->client_fd;
+                else if (sockfd == node_list->nodes[i]->client_fd)
+                        return node_list->nodes[i]->server_fd;
+        }
+        return 0;
+}
+
+void printSecureNodeList(secureNodeList node_list) {
+        printf("Printing secureNodeList\n");
+        for (int i = 0; i < node_list->length; i++) {
+                printf("Index %d client: %d server: %d\n", i, node_list->nodes[i]->client_fd, node_list->nodes[i]->server_fd);
+        }
 }
