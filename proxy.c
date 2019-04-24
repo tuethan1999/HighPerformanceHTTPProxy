@@ -17,7 +17,7 @@
 #include <sys/select.h>
 #include <sys/time.h>
 
-#define BUFSIZE 4096
+#define BUFSIZE 2*4096
 #define BUFLISTSIZE 1
 #define MAX( a, b ) ( ((a) > (b)) ? (a) : (b) )
 
@@ -108,7 +108,8 @@ int main(int argc, char *argv[])
         secureNodeList secure_list = newSecureNodeList();
         int max_sock = listen_fd;
 
-        while(1){        
+        while(1){    
+                //sleep(2);    
                 FD_ZERO(&copy_fd_set);
                 memcpy(&copy_fd_set, &master_fd_set, sizeof(master_fd_set));
                 timeout.tv_sec = 1;
@@ -221,13 +222,14 @@ int handleExistingConnection(int fd, fd_set *master_fd_set, int *max_sock_ptr, b
         int n = read(fd, buffer, BUFSIZE);
         fprintf(stderr, "%s\n", "1000");
         if (n < 0)
-                server_error("ERROR reading from socket");
+                //server_error("ERROR reading from socket");
+                printf("ERROR reading from socket\n");
         else if (n == 0) {
                 free(buffer);
                 return 0;
         }
         else {
-                fprintf(stderr, "Read %d bytes from fd %d:\n", n, fd);
+                fprintf(stderr, "Read %d bytes from fd: %d\n", n, fd);
                 insertPartialBuffer(buffer_list->buffers[fd], buffer, n);
                 printf("successfully added to partial message buffer\n");
                 char *url = isServer(*server_list, fd);
@@ -308,9 +310,36 @@ void handleClient(int fd, fd_set *master_fd_set, int *max_sock_ptr, bufferList b
                         else if (strcmp(req_header->method, "CONNECT") == 0) {
                                 printf("CONNECT request received\nsending confirmation back to client\n");
                                 sendConnectionEstablishedHeader(fd);
+                                printf("Sent header\n");
                                 secureNode_ptr node = newSecureNode(fd, serv_fd);
                                 insertSecureNode(secure_list, node);
                                 printSecureNodeList(secure_list);
+                                
+                                printf("initiating handshake\n");
+                                char *buffer = malloc(sizeof(char)* BUFSIZE);
+                                bzero(buffer, BUFSIZE);
+                                int n = read(fd, buffer, BUFSIZE);
+                                printf("read %d bytes from client\n", n);
+                                n = write(serv_fd, buffer, n);
+                                printf("tunneled %d bytes to server\n", n);
+                                sleep(5);
+                                bzero(buffer, BUFSIZE);
+                                n = read(serv_fd, buffer, BUFSIZE);
+                                printf("read %d bytes from server\n", n);
+                                n = write(fd, buffer, n);
+                                printf("tunneled %d bytes to client\n", n);
+                                sleep(5);
+                                n = read(fd, buffer, BUFSIZE);
+                                printf("read %d bytes from client\n", n);
+                                n = write(serv_fd, buffer, n);
+                                printf("tunneled %d bytes to server\n", n);
+                                sleep(5);
+                                /*bzero(buffer, BUFSIZE);
+                                n = read(serv_fd, buffer, BUFSIZE);
+                                printf("read %d bytes from server\n", n);
+                                n = write(fd, buffer, n);
+                                printf("tunneled %d bytes to client\n", n);
+                                sleep(5);*/
                         }
                 }
                 else if(cache_obj->last_updated != -1 && !is_expired(cache_obj)){
@@ -336,10 +365,12 @@ void handleClient(int fd, fd_set *master_fd_set, int *max_sock_ptr, bufferList b
         else if (findNodeBySockfd(secure_list, fd) > 0) {
                 int dest_fd = findNodeBySockfd(secure_list, fd);
                 printf("Tunneling data from fd %d to fd %d\n", fd, dest_fd);
+                //sleep(5);
                 int n = write(dest_fd, partial_buffer->buffer, partial_buffer->length);
                 if (n < 0)
                         server_error("ERROR tunneling data");
                 printf("Tunneled %d bytes from fd %d to fd %d\n", n, fd, dest_fd);
+                //sleep(5);
                 clearFromBufferList(buffer_list, fd);
         }
 }
@@ -363,6 +394,7 @@ void handleServer(int fd, bufferList buffer_list, Cache_T cache, char* url, secu
                 char *final_msg = headerWithAge(partial_buffer->buffer, &final_msg_size, 0);
                 fprintf(stderr, "final_msg_size: %d\n", final_msg_size);
                 for(int *p=(int*)utarray_front(cache_obj->client_fds); p!=NULL; p=(int*)utarray_next(cache_obj->client_fds,p)) {
+                        printf("in handleServer for loop\n");
                         int n = write(*p, final_msg, final_msg_size);
                         if (n < 0){
                                 fprintf(stderr, "socket: %d\n", *p);
@@ -375,10 +407,12 @@ void handleServer(int fd, bufferList buffer_list, Cache_T cache, char* url, secu
         else if (findNodeBySockfd(secure_list, fd) > 0) {
                 int dest_fd = findNodeBySockfd(secure_list, fd);
                 printf("Tunneling data from fd %d to fd %d\n", fd, dest_fd);
+                //sleep(5);
                 int n = write(dest_fd, partial_buffer->buffer, partial_buffer->length);
                 if (n < 0)
                         server_error("ERROR tunneling data");
                 printf("Tunneled %d bytes from fd %d to fd %d\n", n, fd, dest_fd);
+                //sleep(5);
                 clearFromBufferList(buffer_list, fd);
         }
 }
