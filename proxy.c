@@ -318,22 +318,37 @@ void handleClient(int fd, fd_set *master_fd_set, int *max_sock_ptr, bufferList b
                                 printf("initiating handshake\n");
                                 char *buffer = malloc(sizeof(char)* BUFSIZE);
                                 bzero(buffer, BUFSIZE);
+                                //sleep(5);
+                                printf("Reading from the client:\n");
                                 int n = read(fd, buffer, BUFSIZE);
                                 printf("read %d bytes from client\n", n);
+                                char *buffer2 = malloc(sizeof(char)* BUFSIZE);
+                                bzero(buffer2, BUFSIZE);
+                                //printf("Second read from the client:\n");
+                                //n = read(fd, buffer2, BUFSIZE);
+                                //printf("second read call read %d bytes\n", n);
                                 n = write(serv_fd, buffer, n);
                                 printf("tunneled %d bytes to server\n", n);
-                                sleep(5);
+                                //sleep(5);
                                 bzero(buffer, BUFSIZE);
+                                printf("Reading from the server:\n");
                                 n = read(serv_fd, buffer, BUFSIZE);
                                 printf("read %d bytes from server\n", n);
+                                //bzero(buffer2, BUFSIZE);
+                                //printf("Second read from the server:\n");
+                                //n = read(fd, buffer2, BUFSIZE);
+                                //printf("Second read call read %d bytes\n", n);
                                 n = write(fd, buffer, n);
                                 printf("tunneled %d bytes to client\n", n);
-                                sleep(5);
+                                //sleep(5);
                                 n = read(fd, buffer, BUFSIZE);
                                 printf("read %d bytes from client\n", n);
+                                printf("Second read from the client:\n");
+                                n = read(fd, buffer2, BUFSIZE);
+                                printf("second read call read %d bytes\n", n);
                                 n = write(serv_fd, buffer, n);
                                 printf("tunneled %d bytes to server\n", n);
-                                sleep(5);
+                                //sleep(5);
                                 /*bzero(buffer, BUFSIZE);
                                 n = read(serv_fd, buffer, BUFSIZE);
                                 printf("read %d bytes from server\n", n);
@@ -616,9 +631,9 @@ char* headerWithAge(char* msg, int* msg_size, int age){
 }
 
 void sendConnectionEstablishedHeader(int cli_fd) {
-        //"HTTP/1.1 200 Connection Established\r\nConnection: close\r\n\r\n"
-        char *header = "HTTP/1.1 200 Connection Established\r\n\r\n";
-        int n = write(cli_fd, header, strlen(header)+4);
+        char buffer[100];
+        strcpy(buffer, "HTTP/1.1 200 Connection Established\r\n\r\n");
+        int n = write(cli_fd, buffer, strlen(buffer));
         if (n < 0)
                 server_error("ERROR writing to client");
 }
