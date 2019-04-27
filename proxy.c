@@ -40,7 +40,7 @@ typedef struct secureNodeList {
 }*secureNodeList;
 secureNodeList newSecureNodeList();
 void insertSecureNode(secureNodeList node_list, secureNode_ptr node);
-void deleteSecureNode(secureNodeList node_list, int index);
+void deleteSecureNode(secureNodeList node_list, int sockfd);
 int findNodeBySockfd(secureNodeList node_list, int sockfd);
 void printSecureNodeList(secureNodeList node_list);
 /*************************************************************************************************************************************/
@@ -78,7 +78,7 @@ int setupListenSocket(int port_number);
 int setupServerSocket(HttpReqHead_T header);
 void handleNewConnection(int fd, fd_set *master_fd_set, bufferList buffer_list, int *max_sock_ptr);
 int handleExistingConnection(int fd, fd_set *master_fd_set, int *max_sock_ptr, bufferList buffer_list, Cache_T cache, serverNode_ptr *server_list, secureNodeList secure_list);
-void handleDisconnect(int fd, fd_set *master_fd_set, bufferList buffer_list, int *max_sock_ptr);
+void handleDisconnect(int fd, fd_set *master_fd_set, bufferList buffer_list, int *max_sock_ptr, secureNodeList node_list);
 void handleClient(int fd, fd_set *master_fd_set, int *max_sock_ptr, bufferList buffer_list, Cache_T cache, serverNode_ptr *server_list, secureNodeList secure_list);
 void handleServer(int fd, bufferList buffer_list, Cache_T cache, char* url, secureNodeList secure_list);
 /*************************************************************************************************************************************/
@@ -131,7 +131,7 @@ int main(int argc, char *argv[])
                                         handleNewConnection(fd, &master_fd_set, buffer_list, &max_sock);
                                 }
                                 else if(!handleExistingConnection(fd, &master_fd_set, &max_sock, buffer_list, cache, &server_list, secure_list)){
-                                        handleDisconnect(fd, &master_fd_set, buffer_list, &max_sock);
+                                        handleDisconnect(fd, &master_fd_set, buffer_list, &max_sock, secure_list);
                                 }
                         }
                         //print_cache(cache);
@@ -220,7 +220,6 @@ int handleExistingConnection(int fd, fd_set *master_fd_set, int *max_sock_ptr, b
         char *buffer = malloc(sizeof(char)* BUFSIZE);
         bzero(buffer, BUFSIZE);
         int n = read(fd, buffer, BUFSIZE);
-        fprintf(stderr, "%s\n", "1000");
         if (n < 0)
                 //server_error("ERROR reading from socket");
                 printf("ERROR reading from socket\n");
@@ -244,13 +243,14 @@ int handleExistingConnection(int fd, fd_set *master_fd_set, int *max_sock_ptr, b
         return 1;
 }
 
-void handleDisconnect(int fd, fd_set* master_fd_set, bufferList buffer_list, int *max_sock_ptr)
+void handleDisconnect(int fd, fd_set* master_fd_set, bufferList buffer_list, int *max_sock_ptr, secureNodeList node_list)
 {
         fprintf(stderr, "Handle disconnection of fd %d\n", fd);
         deleteFromBufferList(buffer_list, fd);
         close(fd);
         if(*max_sock_ptr == fd) 
                 *max_sock_ptr -=1;
+        deleteSecureNode(node_list, fd);
         FD_CLR(fd, master_fd_set);
 }
 
@@ -314,47 +314,6 @@ void handleClient(int fd, fd_set *master_fd_set, int *max_sock_ptr, bufferList b
                                 secureNode_ptr node = newSecureNode(fd, serv_fd);
                                 insertSecureNode(secure_list, node);
                                 printSecureNodeList(secure_list);
-                                
-                                printf("initiating handshake\n");
-                                char *buffer = malloc(sizeof(char)* BUFSIZE);
-                                bzero(buffer, BUFSIZE);
-                                //sleep(5);
-                                printf("Reading from the client:\n");
-                                int n = read(fd, buffer, BUFSIZE);
-                                printf("read %d bytes from client\n", n);
-                                char *buffer2 = malloc(sizeof(char)* BUFSIZE);
-                                bzero(buffer2, BUFSIZE);
-                                //printf("Second read from the client:\n");
-                                //n = read(fd, buffer2, BUFSIZE);
-                                //printf("second read call read %d bytes\n", n);
-                                n = write(serv_fd, buffer, n);
-                                printf("tunneled %d bytes to server\n", n);
-                                //sleep(5);
-                                bzero(buffer, BUFSIZE);
-                                printf("Reading from the server:\n");
-                                n = read(serv_fd, buffer, BUFSIZE);
-                                printf("read %d bytes from server\n", n);
-                                //bzero(buffer2, BUFSIZE);
-                                //printf("Second read from the server:\n");
-                                //n = read(fd, buffer2, BUFSIZE);
-                                //printf("Second read call read %d bytes\n", n);
-                                n = write(fd, buffer, n);
-                                printf("tunneled %d bytes to client\n", n);
-                                //sleep(5);
-                                n = read(fd, buffer, BUFSIZE);
-                                printf("read %d bytes from client\n", n);
-                                printf("Second read from the client:\n");
-                                n = read(fd, buffer2, BUFSIZE);
-                                printf("second read call read %d bytes\n", n);
-                                n = write(serv_fd, buffer, n);
-                                printf("tunneled %d bytes to server\n", n);
-                                //sleep(5);
-                                /*bzero(buffer, BUFSIZE);
-                                n = read(serv_fd, buffer, BUFSIZE);
-                                printf("read %d bytes from server\n", n);
-                                n = write(fd, buffer, n);
-                                printf("tunneled %d bytes to client\n", n);
-                                sleep(5);*/
                         }
                 }
                 else if(cache_obj->last_updated != -1 && !is_expired(cache_obj)){
@@ -689,8 +648,25 @@ void insertSecureNode(secureNodeList node_list, secureNode_ptr node) {
         node_list->length++;
 }
 
-void deleteSecureNode(secureNodeList node_list, int index) {
-        // TODO
+void deleteSecureNode(secureNodeList node_list, int sockfd) {
+        /*printf("in deleteSecureNode. before deleting:\n");
+        printSecureNodeList(node_list);*/
+        int delete_index = -1;
+        for (int i = 0; i < node_list->length; i++) {
+                if (sockfd == node_list->nodes[i]->server_fd || sockfd == node_list->nodes[i]->client_fd) {
+                        delete_index = i;
+                }
+        }
+        if (delete_index >= 0) {
+                for (int i = delete_index; i < node_list->length-1; i++) {
+                        node_list->nodes[i+1]->server_fd = node_list->nodes[i]->server_fd;
+                        node_list->nodes[i+1]->client_fd = node_list->nodes[i]->client_fd;
+                }
+                free(node_list->nodes[node_list->length]);
+                node_list->length--;
+        }
+        /*printf("after deleting:\n");
+        printSecureNodeList(node_list);)*/
 }
 
 int findNodeBySockfd(secureNodeList node_list, int sockfd) {
