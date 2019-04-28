@@ -247,11 +247,16 @@ void handleDisconnect(int fd, fd_set* master_fd_set, bufferList buffer_list, int
 {
         fprintf(stderr, "Handle disconnection of fd %d\n", fd);
         deleteFromBufferList(buffer_list, fd);
+        printf("out of deleteFromBufferList\n");
         close(fd);
+        printf("connection with fd %d closed\n", fd);
         if(*max_sock_ptr == fd) 
                 *max_sock_ptr -=1;
+        printf("going into deleteSecureNode\n");
         deleteSecureNode(node_list, fd);
+        printf("out of deleteSecureNode\n");
         FD_CLR(fd, master_fd_set);
+        printf("finished with handleDisconnect\n");
 }
 
 void handleClient(int fd, fd_set *master_fd_set, int *max_sock_ptr, bufferList buffer_list, Cache_T cache, serverNode_ptr *server_list, secureNodeList secure_list)
@@ -265,19 +270,7 @@ void handleClient(int fd, fd_set *master_fd_set, int *max_sock_ptr, bufferList b
                 print_http_req_head(req_header);
                 CacheObj_T cache_obj = find_by_url(cache, req_header->url);
                 if(cache_obj == NULL){
-                        /*make new cache_object*/
-                        cache_obj = new_cache_object();
-                        cache_obj->req_header = req_header;
-
-                        cache_obj->url = malloc(strlen(req_header->url) + 1);
-                        strncpy(cache_obj->url, req_header->url, strlen(req_header->url));
-                        cache_obj->request_buffer = malloc(partial_buffer->length);
-                        memcpy(cache_obj->request_buffer, partial_buffer->buffer, partial_buffer->length);
-
-                        cache_obj->request_length = partial_buffer->length;
-                        cache_obj->last_requested = time(NULL);
-                        utarray_push_back(cache_obj->client_fds, &fd);
-                        insert_into_cache(cache, cache_obj);
+                        
 
                         /*create connection to server and add node to server list*/
                         int serv_fd = setupServerSocket(req_header);
@@ -296,8 +289,22 @@ void handleClient(int fd, fd_set *master_fd_set, int *max_sock_ptr, bufferList b
 
                         printf("req_header->method = %s\n", req_header->method);
 
-                        /*write to server*/
+                        /*write to server if GET request*/
                         if (strcmp(req_header->method, "GET") == 0) {
+                                /*make new cache_object*/
+                                cache_obj = new_cache_object();
+                                cache_obj->req_header = req_header;
+
+                                cache_obj->url = malloc(strlen(req_header->url) + 1);
+                                strncpy(cache_obj->url, req_header->url, strlen(req_header->url));
+                                cache_obj->request_buffer = malloc(partial_buffer->length);
+                                memcpy(cache_obj->request_buffer, partial_buffer->buffer, partial_buffer->length);
+
+                                cache_obj->request_length = partial_buffer->length;
+                                cache_obj->last_requested = time(NULL);
+                                utarray_push_back(cache_obj->client_fds, &fd);
+                                insert_into_cache(cache, cache_obj);
+
                                 printf("writing this to the server:\n");
                                 for (int i = 0; i < cache_obj->request_length; i++) {
                                         printf("%c", cache_obj->request_buffer[i]);
@@ -306,7 +313,9 @@ void handleClient(int fd, fd_set *master_fd_set, int *max_sock_ptr, bufferList b
                                 if (n < 0)
                                         server_error("ERROR writing to server");
                                 fprintf(stderr, "wrote %d bytes to server\n", n);
+
                         }
+                        /*establish tunnel if CONNECT request*/
                         else if (strcmp(req_header->method, "CONNECT") == 0) {
                                 printf("CONNECT request received\nsending confirmation back to client\n");
                                 sendConnectionEstablishedHeader(fd);
@@ -314,6 +323,7 @@ void handleClient(int fd, fd_set *master_fd_set, int *max_sock_ptr, bufferList b
                                 secureNode_ptr node = newSecureNode(fd, serv_fd);
                                 insertSecureNode(secure_list, node);
                                 printSecureNodeList(secure_list);
+                                //delete_by_sockfd(cache, fd); // secure connections should not be cached
                         }
                 }
                 else if(cache_obj->last_updated != -1 && !is_expired(cache_obj)){
@@ -495,9 +505,12 @@ void printPartialBuffer(partialBuffer_ptr partial_buffer)
 
 void deletePartialBuffer(partialBuffer_ptr partial_buffer)
 {
+        printf("in deletePartialBuffer\n");
         if(partial_buffer == NULL) return;
         free(partial_buffer->buffer);
+        printf("freed partial_buffer->buffer\n");
         free(partial_buffer);
+        printf("freed partial_buffer\n");
 }
 
 /*************************************************************************************************************************************/
@@ -649,8 +662,8 @@ void insertSecureNode(secureNodeList node_list, secureNode_ptr node) {
 }
 
 void deleteSecureNode(secureNodeList node_list, int sockfd) {
-        /*printf("in deleteSecureNode. before deleting:\n");
-        printSecureNodeList(node_list);*/
+        printf("in deleteSecureNode. length = %d. before deleting:\n", node_list->length);
+        printSecureNodeList(node_list);
         int delete_index = -1;
         for (int i = 0; i < node_list->length; i++) {
                 if (sockfd == node_list->nodes[i]->server_fd || sockfd == node_list->nodes[i]->client_fd) {
@@ -662,11 +675,11 @@ void deleteSecureNode(secureNodeList node_list, int sockfd) {
                         node_list->nodes[i+1]->server_fd = node_list->nodes[i]->server_fd;
                         node_list->nodes[i+1]->client_fd = node_list->nodes[i]->client_fd;
                 }
-                free(node_list->nodes[node_list->length]);
+                free(node_list->nodes[node_list->length-1]);
                 node_list->length--;
         }
-        /*printf("after deleting:\n");
-        printSecureNodeList(node_list);)*/
+        printf("after deleting:\n");
+        printSecureNodeList(node_list);
 }
 
 int findNodeBySockfd(secureNodeList node_list, int sockfd) {
