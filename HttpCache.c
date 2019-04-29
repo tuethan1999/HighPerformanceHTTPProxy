@@ -46,6 +46,7 @@ void insert_into_cache(Cache_T cache, CacheObj_T obj)
 
 CacheObj_T find_by_url(Cache_T cache, char* url)
 {
+        fprintf(stderr, "looking for %s in cache\n", url);
         for(int i = 0; i < cache->capacity; i++){
                 if(cache->arr[i] == NULL)
                         continue;
@@ -85,7 +86,12 @@ void delete_expired(Cache_T cache)
 
 void delete_by_sockfd(Cache_T cache, int sockfd)
 {
-        return;
+        for(int i = 0; i < cache->capacity; i++){
+                CacheObj_T cache_obj = cache->arr[i];
+                if(cache_obj == NULL)
+                        continue;
+                delete_from_clientfds(cache_obj, sockfd);
+        }
 }       
 
 void free_cache(Cache_T cache)

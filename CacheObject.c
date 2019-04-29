@@ -57,6 +57,15 @@ void print_cache_object(CacheObj_T cache_obj)
         printf("%*s: %*d\n", FIELD_NAME_LENGTH, "Response Length", CONTENT_LENGTH, cache_obj->response_length);
         if(cache_obj->res_header) print_http_res_head(cache_obj->res_header);
         if(cache_obj->req_header) print_http_req_head(cache_obj->req_header);
+        int* p;
+        printf("clientfds: ");
+        for(p=(int*)utarray_front(cache_obj->client_fds);
+                p!=NULL;
+                p=(int*)utarray_next(cache_obj->client_fds, p)) {
+                printf("|%d|",* p);
+        }
+        printf("\n");
+
         printf("--------------------------------\n");
 }
 
