@@ -87,7 +87,7 @@ void handleClient(int fd, fd_set *master_fd_set, int *max_sock_ptr, bufferList b
 void handleServer(int fd,  fd_set *master_fd_set, bufferList buffer_list, Cache_T cache, char* url,
  serverNode_ptr *server_list, secureNodeList secure_list);
 /*************************************************************************************************************************************/
-char* headerWithAge(char* msg, int* msg_size, int age);
+char* headerWithAge(char* msg, int* msg_size, long age);
 void sendConnectionEstablishedHeader(int serv_fd);
 /*************************************************************************************************************************************/
 
@@ -337,11 +337,11 @@ void handleClient(int fd, fd_set *master_fd_set, int *max_sock_ptr, bufferList b
                 }
                 else if(cache_obj->last_updated != -1 && !is_expired(cache_obj)){
                         fprintf(stderr, "%s\n", "Valid response in cache");
-                        fprintf(stderr, "age: %d, max age: %d\n", (time(NULL) - cache_obj->last_updated), cache_obj->res_header->max_age);
+                        fprintf(stderr, "age: %ld, max age: %d\n", (time(NULL) - cache_obj->last_updated), cache_obj->res_header->max_age);
                         int final_msg_size = cache_obj->response_length;
                         cache_obj->last_requested = time(NULL);
                         char *final_msg = headerWithAge(cache_obj->response_buffer, &final_msg_size, (time(NULL) - cache_obj->last_updated));
-                        //char *final_msg = cache_obj->response_buffer;
+                        //char *final_msg  = cache_obj->response_buffer;
                         int n = write(fd, final_msg, final_msg_size);
                         if (n < 0)
                                 server_error("ERROR writing to client");
@@ -385,7 +385,7 @@ void handleServer(int fd, fd_set *master_fd_set, bufferList buffer_list, Cache_T
 
                 int final_msg_size = partial_buffer->length;
                 char *final_msg = headerWithAge(partial_buffer->buffer, &final_msg_size, 0);
-                //char*final_msg = partial_buffer->buffer;
+                //char *final_msg  = cache_obj->response_buffer;
                 fprintf(stderr, "final_msg_size: %d\n", final_msg_size);
                 for(int *p=(int*)utarray_front(cache_obj->client_fds); p!=NULL; p=(int*)utarray_next(cache_obj->client_fds,p)) {
                         printf("in handleServer for loop\n");
@@ -616,42 +616,26 @@ void printBufferList(bufferList buffer_list)
 /*************************************************************************************************************************************/
 /*************************************************************************************************************************************/
 
-char* headerWithAge(char* msg, int* msg_size, int age){
-/*        int bytes_copied =0;
-        char input[20];
-        sprintf(input, "\r\nAge: %d", age);
-        *msg_size += strlen(input);
-        char* response = malloc(*msg_size);
-
-        char* header_end = "\r\n";
-        char* end_of_header = strstr(msg, header_end);
-        int len_first_line = end_of_header-msg;
-        
-        strncpy(response, msg, len_first_line);
-        
-        strncpy(response + bytes_copied, input, strlen(input));
-        bytes_copied += strlen(input);
-        
-        strncpy(response + bytes_copied, msg + len_first_line, *msg_size-bytes_copied);*/
+char* headerWithAge(char* msg, int* msg_size, long age){
         int bytes_copied =0;
         char input[100];
-        sprintf(input, "\r\nAge: %d", age);
+        sprintf(input, "\r\nAge: %ld", age);
         //printf("%s, %d\n", input, strlen(input));
         *msg_size += strlen(input);
         char* response = malloc(*msg_size);
 
-        char* header_end = "\r\n";
-        char* end_of_header = strstr(msg, header_end);
-        int len_first_line = end_of_header-msg;
+        char* first_line_end = "\r\n";
+        char* end_of_first_line = strstr(msg, first_line_end);
+        int len_first_line = end_of_first_line-msg;
+
         /*copy first line*/
-        strncpy(response, msg, len_first_line);
+        memcpy(response, msg, len_first_line);
         bytes_copied += len_first_line;
         /*copy my line*/
-        strncpy(response + bytes_copied, input, strlen(input));
+        memcpy(response + bytes_copied, input, strlen(input));
         bytes_copied += strlen(input);
         /*copy rest of msg*/
-        strncpy(response + bytes_copied, msg + len_first_line, *msg_size-bytes_copied);
-
+        memcpy(response + bytes_copied, msg + len_first_line, *msg_size-bytes_copied);
         return response;
 }
 
