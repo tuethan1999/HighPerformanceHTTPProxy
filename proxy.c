@@ -210,6 +210,7 @@ int handleExistingConnection(int fd, fd_set *master_fd_set, int *max_sock_ptr, b
                 //server_error("ERROR reading from socket");
                 printf("ERROR reading from socket\n");
         else if (n == 0) {
+                printf("Read 0 bytes\n");
                 free(buffer);
                 return 0;
         }
@@ -333,6 +334,7 @@ void handleClient(int fd, fd_set *master_fd_set, int *max_sock_ptr, bufferList b
                 else{
                         fprintf(stderr, "%s\n", "Invalid response in cache");
                 }
+                printf("entering clearFromBufferList\n");
                 clearFromBufferList(buffer_list, fd, partial_buffer->length);
         }
         else if (findNodeBySockfd(secure_list, fd) > 0) {
@@ -369,11 +371,7 @@ void handleServer(int fd, fd_set *master_fd_set, bufferList buffer_list, Cache_T
                 fprintf(stderr, "final_msg_size: %d\n", final_msg_size);
                 for(int *p=(int*)utarray_front(cache_obj->client_fds); p!=NULL; p=(int*)utarray_next(cache_obj->client_fds,p)) {
                         printf("in handleServer for loop\n");
-                        /*int n = write(*p, final_msg, final_msg_size);
-                        if (n < 0){
-                                fprintf(stderr, "socket: %d\n", *p);
-                                server_error("ERROR writing to socket");
-                        }*/
+
                         int n = use_tokens(buffer_list, final_msg, *p, final_msg_size);
                         if (n >= 0) {
                                 printf("wrote %d bytes to fd %d\n", n, *p);
@@ -551,7 +549,7 @@ secureNodeList newSecureNodeList() {
 }
 
 void insertSecureNode(secureNodeList node_list, secureNode_ptr node) {
-        printf("in insertPartialBuffer\n");
+        printf("in insertSecureNode\n");
         while ((node_list->size - node_list->length) <= 0) {
                 int new_size = 2*node_list->size;
                 int new_size_bytes = new_size * sizeof(secureNode_ptr);
@@ -614,7 +612,6 @@ void printSecureNodeList(secureNodeList node_list) {
 /*************************************************************************************************************************************/
 /*************************************************************************************************************************************/
 
-// TODO change to add as many tokens as needed since tokens were last added (might be more than just 1)
 void add_tokens(bufferList buffer_list, int listen_sock, int length) {
         printf("in add_tokens\n");
         for (int i = listen_sock+1; i < length; i++) {
@@ -659,7 +656,6 @@ int use_tokens(bufferList buffer_list, char *msg, int recv_fd, int msg_size) {
 void check_cached_messages(Cache_T cache, bufferList buffer_list) {
         for (int i = 0; i < cache->num_obj; i++) {
                 if (cache->arr[i]->response_buffer != NULL) {
-                        //for(int *p=(int*)utarray_front(cache_obj->client_fds); p!=NULL; p=(int*)utarray_next(cache_obj->client_fds,p)) {
                         for(int *p=(int*)utarray_front(cache->arr[i]->client_fds); p!=NULL; p=(int*)utarray_next(cache->arr[i]->client_fds,p)) {
                                 use_tokens(buffer_list, cache->arr[i]->response_buffer, *p, cache->arr[i]->response_length);
                         }

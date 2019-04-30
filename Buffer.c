@@ -34,7 +34,7 @@ partialBuffer_ptr newPartialBuffer()
 
 void insertPartialBuffer(partialBuffer_ptr partial_buffer, char* msg, int length)
 {
-        printf("in insertPartialBuffer\n");
+        printf("in insertPartialBuffer, current buffer length: %d\n", partial_buffer->length);
         if (length >= partial_buffer->size - partial_buffer->length) {
                 int new_size = 2*partial_buffer->size;
                 fprintf(stderr, "length of msg is %d, expanding partial buffer size from %d -> %d\n", length, partial_buffer->size, new_size);
@@ -44,6 +44,7 @@ void insertPartialBuffer(partialBuffer_ptr partial_buffer, char* msg, int length
         int position = partial_buffer->length;
         memcpy(partial_buffer->buffer + position, msg, length);
         partial_buffer->length += length;
+        printf("added %d bytes, current length is %d\n", length, partial_buffer->length);
 }
 
 void printPartialBuffer(partialBuffer_ptr partial_buffer)
@@ -113,14 +114,14 @@ void clearFromBufferList(bufferList buffer_list, int index, int length) {
         partialBuffer_ptr partial_buffer =  buffer_list->buffers[index];
         char *new_buffer = malloc(partial_buffer->size);
         bzero(new_buffer, partial_buffer->size);
+        printf("size is %d, length is %d\n", partial_buffer->size, partial_buffer->length);
         int bytes_to_copy = partial_buffer->size - partial_buffer->length;
         memcpy(new_buffer, partial_buffer->buffer+length, bytes_to_copy);
 
         free(partial_buffer->buffer);
         partial_buffer->buffer = new_buffer;
-        //deletePartialBuffer(partial_buffer);
-        //partialBuffer_ptr new_partial_buffer =  newPartialBuffer();
-        //insertBufferList(buffer_list, new_partial_buffer, index);
+        partial_buffer->length -= length;
+        printf("finished clearing, current buffer length is %d\n", partial_buffer->length);
 }
 
 void printBufferList(bufferList buffer_list)
