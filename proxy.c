@@ -2,6 +2,7 @@
 #include "HttpReqParser.h"
 #include "HttpResParser.h"
 #include "HttpCache.h"
+#include "Buffer.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -20,11 +21,6 @@
 #define BUFSIZE 2*4096
 #define BUFLISTSIZE 1
 #define MAX( a, b ) ( ((a) > (b)) ? (a) : (b) )
-
-void server_error(char *msg) {
-        perror(msg);
-        exit(EXIT_FAILURE);
-}
 
 /*************************************************************************************************************************************/
 typedef struct secureNode {
@@ -55,26 +51,6 @@ void printServerList(serverNode_ptr server_list);
 void deleteFromServerList(serverNode_ptr *server_list, int fd);
 char* isServer(serverNode_ptr server_list, int fd);
 /*************************************************************************************************************************************/
-typedef struct partialBuffer {
-        char *buffer;
-        int length;
-        int size;
-}*partialBuffer_ptr;
-partialBuffer_ptr newPartialBuffer();
-void insertPartialBuffer(partialBuffer_ptr partial_buffer, char* msg, int length);
-void printPartialBuffer(partialBuffer_ptr partial_buffer);
-void deletePartialBuffer(partialBuffer_ptr partial_buffer);
-/*************************************************************************************************************************************/
-typedef struct bufferListStruct{
-        partialBuffer_ptr *buffers;
-        int size;
-}*bufferList;
-bufferList newBufferList();
-void insertBufferList(bufferList buffer_list, partialBuffer_ptr partial_buffer, int index);
-void deleteFromBufferList(bufferList buffer_list, int index);
-void clearFromBufferList(bufferList buffer_list, int index);
-void printBufferList(bufferList buffer_list);
-/*************************************************************************************************************************************/
 int setupListenSocket(int port_number);
 int setupServerSocket(HttpReqHead_T header);
 void handleNewConnection(int fd, fd_set *master_fd_set, bufferList buffer_list, int *max_sock_ptr);
@@ -90,7 +66,9 @@ void handleServer(int fd,  fd_set *master_fd_set, bufferList buffer_list, Cache_
 char* headerWithAge(char* msg, int* msg_size, long age);
 void sendConnectionEstablishedHeader(int serv_fd);
 /*************************************************************************************************************************************/
-
+void add_tokens(bufferList buffer_list, int listen_sock, int length);
+int use_tokens(bufferList buffer_list, char *msg, int recv_fd, int msg_size);
+void check_cached_messages(Cache_T cache, bufferList buffer_list);
 
 int main(int argc, char *argv[])
 {
@@ -114,7 +92,9 @@ int main(int argc, char *argv[])
         int max_sock = listen_fd;
 
         while(1){    
-                //sleep(2);    
+                //sleep(2);
+                add_tokens(buffer_list, listen_fd, max_sock); 
+                check_cached_messages(cache, buffer_list);  
                 FD_ZERO(&copy_fd_set);
                 memcpy(&copy_fd_set, &master_fd_set, sizeof(master_fd_set));
                 timeout.tv_sec = 1;
@@ -353,7 +333,7 @@ void handleClient(int fd, fd_set *master_fd_set, int *max_sock_ptr, bufferList b
                 else{
                         fprintf(stderr, "%s\n", "Invalid response in cache");
                 }
-                clearFromBufferList(buffer_list, fd);
+                clearFromBufferList(buffer_list, fd, partial_buffer->length);
         }
         else if (findNodeBySockfd(secure_list, fd) > 0) {
                 int dest_fd = findNodeBySockfd(secure_list, fd);
@@ -364,7 +344,7 @@ void handleClient(int fd, fd_set *master_fd_set, int *max_sock_ptr, bufferList b
                         server_error("ERROR tunneling data");
                 printf("Tunneled %d bytes from fd %d to fd %d\n", n, fd, dest_fd);
                 //sleep(5);
-                clearFromBufferList(buffer_list, fd);
+                clearFromBufferList(buffer_list, fd, partial_buffer->length);
         }
 }
 
@@ -389,12 +369,19 @@ void handleServer(int fd, fd_set *master_fd_set, bufferList buffer_list, Cache_T
                 fprintf(stderr, "final_msg_size: %d\n", final_msg_size);
                 for(int *p=(int*)utarray_front(cache_obj->client_fds); p!=NULL; p=(int*)utarray_next(cache_obj->client_fds,p)) {
                         printf("in handleServer for loop\n");
-                        int n = write(*p, final_msg, final_msg_size);
+                        /*int n = write(*p, final_msg, final_msg_size);
                         if (n < 0){
                                 fprintf(stderr, "socket: %d\n", *p);
                                 server_error("ERROR writing to socket");
+                        }*/
+                        int n = use_tokens(buffer_list, final_msg, *p, final_msg_size);
+                        if (n >= 0) {
+                                printf("wrote %d bytes to fd %d\n", n, *p);
+                                delete_from_clientfds(cache_obj, *p);
                         }
-                        printf("wrote %d bytes to fd %d\n", n, *p);
+                        else {
+                                printf("Not enough tokens to write to fd %d\n", *p);
+                        }
                 }
                 free(final_msg);
                 close(fd);
@@ -412,7 +399,7 @@ void handleServer(int fd, fd_set *master_fd_set, bufferList buffer_list, Cache_T
                         server_error("ERROR tunneling data");
                 printf("Tunneled %d bytes from fd %d to fd %d\n", n, fd, dest_fd);
                 //sleep(5);
-                clearFromBufferList(buffer_list, fd);
+                clearFromBufferList(buffer_list, fd, partial_buffer->length);
         }
 }
 /*************************************************************************************************************************************/
@@ -490,123 +477,6 @@ char* isServer(serverNode_ptr server_list, int fd)
                 }
         }
         return url;
-}
-/*************************************************************************************************************************************/
-/*************************************************************************************************************************************/
-/*************************************************************************************************************************************/
-/*************************************************************************************************************************************/
-/*************************************************************************************************************************************/
-/*************************************************************************************************************************************/
-/*************************************************************************************************************************************/
-partialBuffer_ptr newPartialBuffer()
-{
-        partialBuffer_ptr buf = malloc(sizeof(*buf));
-        if (buf == NULL) server_error("create partialBuffer_ptr");
-        buf->buffer = malloc(BUFSIZE);
-        memset(buf->buffer, 0, BUFSIZE);
-        if (buf->buffer == NULL) server_error("create partialBuffer_ptr buffer");
-        buf->size = BUFSIZE;
-        buf->length = 0;
-        return buf;
-}
-
-void insertPartialBuffer(partialBuffer_ptr partial_buffer, char* msg, int length)
-{
-        printf("in insertPartialBuffer\n");
-        if (length >= partial_buffer->size - partial_buffer->length) {
-                int new_size = 2*partial_buffer->size;
-                fprintf(stderr, "length of msg is %d, expanding partial buffer size from %d -> %d\n", length, partial_buffer->size, new_size);
-                partial_buffer->buffer = realloc(partial_buffer->buffer, new_size);
-                partial_buffer->size = new_size;
-        }
-        int position = partial_buffer->length;
-        memcpy(partial_buffer->buffer + position, msg, length);
-        partial_buffer->length += length;
-}
-
-void printPartialBuffer(partialBuffer_ptr partial_buffer)
-{
-        if(partial_buffer == NULL || partial_buffer->buffer == NULL) return;
-        if(partial_buffer->length == 0){
-                fprintf(stderr, "--empty partial buffer--\n");
-                return;
-        }
-        fprintf(stderr, "--------------------------------------\n");
-        for(int i = 0; i < partial_buffer->length; i++){
-                fprintf(stderr, "%c", partial_buffer->buffer[i]);
-        }
-        fprintf(stderr, "--------------------------------------\n");
-}
-
-void deletePartialBuffer(partialBuffer_ptr partial_buffer)
-{
-        printf("in deletePartialBuffer\n");
-        if(partial_buffer == NULL) return;
-        free(partial_buffer->buffer);
-        printf("freed partial_buffer->buffer\n");
-        free(partial_buffer);
-        printf("freed partial_buffer\n");
-}
-
-/*************************************************************************************************************************************/
-/*************************************************************************************************************************************/
-/*************************************************************************************************************************************/
-/*************************************************************************************************************************************/
-/*************************************************************************************************************************************/
-/*************************************************************************************************************************************/
-/*************************************************************************************************************************************/
-bufferList newBufferList()
-{
-        bufferList buffer_list = malloc(sizeof(*buffer_list));
-        if (buffer_list == NULL) server_error("create bufferList");
-        buffer_list->buffers = malloc(BUFLISTSIZE * sizeof(partialBuffer_ptr));
-        memset(buffer_list->buffers, 0, BUFLISTSIZE * sizeof(partialBuffer_ptr));
-        if (buffer_list->buffers == NULL) server_error("create bufferList buffers");
-        buffer_list->size = BUFLISTSIZE;
-        return buffer_list; 
-}
-
-void insertBufferList(bufferList buffer_list, partialBuffer_ptr partial_buffer, int index)
-{
-        while(index >= buffer_list->size){
-                int new_size = 2*buffer_list->size;
-                int new_size_bytes = new_size * sizeof(partialBuffer_ptr);
-                int old_size_bytes = buffer_list->size * sizeof(partialBuffer_ptr);
-                fprintf(stderr, "index is %d, expanding buffer list size from %d -> %d\n", index, buffer_list->size, new_size);
-                partialBuffer_ptr *new_list = malloc(new_size_bytes);
-                memset(new_list, 0, new_size_bytes);
-                memcpy(new_list, buffer_list->buffers, old_size_bytes);
-                free(buffer_list->buffers);
-                buffer_list->buffers = new_list;
-                buffer_list->size = new_size;
-        }
-        buffer_list->buffers[index] = partial_buffer;
-}
-
-void deleteFromBufferList(bufferList buffer_list, int index)
-{
-        fprintf(stderr, "deleting fd: %d from buffer list\n", index);
-        partialBuffer_ptr partial_buffer =  buffer_list->buffers[index];
-        deletePartialBuffer(partial_buffer);
-        buffer_list->buffers[index] = NULL;
-}
-
-void clearFromBufferList(bufferList buffer_list, int index) {
-        fprintf(stderr, "clearing buffer of fd: %d\n", index);
-        partialBuffer_ptr partial_buffer =  buffer_list->buffers[index];
-        deletePartialBuffer(partial_buffer);
-        partialBuffer_ptr new_partial_buffer =  newPartialBuffer();
-        insertBufferList(buffer_list, new_partial_buffer, index);
-}
-
-void printBufferList(bufferList buffer_list)
-{       
-        fprintf(stderr, "%s\n", "printing buffer list");
-        for(int i = 0; i < buffer_list->size; i++){
-                fprintf(stderr, "fd: %d\n", i);
-                partialBuffer_ptr current_buffer = buffer_list->buffers[i];
-                printPartialBuffer(current_buffer);
-        }
 }
 /*************************************************************************************************************************************/
 /*************************************************************************************************************************************/
@@ -733,5 +603,66 @@ void printSecureNodeList(secureNodeList node_list) {
         printf("Printing secureNodeList\n");
         for (int i = 0; i < node_list->length; i++) {
                 printf("Index %d client: %d server: %d\n", i, node_list->nodes[i]->client_fd, node_list->nodes[i]->server_fd);
+        }
+}
+
+/*************************************************************************************************************************************/
+/*************************************************************************************************************************************/
+/*************************************************************************************************************************************/
+/*************************************************************************************************************************************/
+/*************************************************************************************************************************************/
+/*************************************************************************************************************************************/
+/*************************************************************************************************************************************/
+
+// TODO change to add as many tokens as needed since tokens were last added (might be more than just 1)
+void add_tokens(bufferList buffer_list, int listen_sock, int length) {
+        printf("in add_tokens\n");
+        for (int i = listen_sock+1; i < length; i++) {
+                if (buffer_list->buffers[i] != NULL) {
+                        Bucket_ptr bucket = buffer_list->buffers[i]->bucket;
+                        printf("%d not NULL, has %d tokens\n", i, buffer_list->buffers[i]->bucket->tokens);
+                        struct timeval now;
+                        gettimeofday(&now, NULL);
+                        int now_time = 1000000*now.tv_sec + now.tv_usec;
+                        int last_time = 1000000*bucket->last_updated.tv_sec + bucket->last_updated.tv_usec;
+                        printf("time now: %d\n last update: %d\n", now_time, last_time);
+                        int between_updates = now_time - last_time;
+                        printf("time since last update: %d\n", between_updates);
+                        int num_tokens = (between_updates * bucket->token_rate)/1000000;
+                        if (bucket->tokens + num_tokens > bucket->bucket_size) {
+                                bucket->tokens = bucket->bucket_size;
+                                printf("fd %d has a full bucket\n", i);
+                        }
+                        else {
+                                bucket->tokens += num_tokens;
+                                printf("added %d tokens to fd %d. bucket contains %d tokens\n", num_tokens, i, bucket->tokens);
+                        }
+                        gettimeofday(&bucket->last_updated, NULL);
+                }
+        }
+}
+
+int use_tokens(bufferList buffer_list, char *msg, int recv_fd, int msg_size) {
+        printf("fd %d has %d tokens\n", recv_fd, buffer_list->buffers[recv_fd]->bucket->tokens);
+        if (buffer_list->buffers[recv_fd]->bucket->tokens >= msg_size) {
+                int n = write(recv_fd, msg, msg_size);
+                if (n < 0)
+                        server_error("ERROR writing to client");
+                buffer_list->buffers[recv_fd]->bucket->tokens -= msg_size;
+                printf("after writing, fd %d has %d tokens\n", recv_fd, buffer_list->buffers[recv_fd]->bucket->tokens);
+                return n;
+        }
+        else
+                return -1;
+}
+
+void check_cached_messages(Cache_T cache, bufferList buffer_list) {
+        for (int i = 0; i < cache->num_obj; i++) {
+                if (cache->arr[i]->response_buffer != NULL) {
+                        //for(int *p=(int*)utarray_front(cache_obj->client_fds); p!=NULL; p=(int*)utarray_next(cache_obj->client_fds,p)) {
+                        for(int *p=(int*)utarray_front(cache->arr[i]->client_fds); p!=NULL; p=(int*)utarray_next(cache->arr[i]->client_fds,p)) {
+                                use_tokens(buffer_list, cache->arr[i]->response_buffer, *p, cache->arr[i]->response_length);
+                        }
+                }
         }
 }
