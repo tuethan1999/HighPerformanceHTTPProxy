@@ -11,7 +11,7 @@ EXECS   = proxy cache clean
 
 all: $(EXECS)
 
-proxy: proxy.o HttpReqParser.o HttpResParser.o HttpCache.o CacheObject.o
+proxy: proxy.o HttpReqParser.o HttpResParser.o HttpCache.o CacheObject.o Buffer.o Bucket.o
 	$(CC) $(LDFLAGS) $^ -o $@ $(LDLIBS)
 cache: cache_tests.o HttpCache.o CacheObject.o
 	$(CC) $(LDFLAGS) $^ -o $@ $(LDLIBS)
