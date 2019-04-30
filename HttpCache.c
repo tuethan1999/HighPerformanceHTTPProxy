@@ -3,11 +3,11 @@
 #include <stdio.h>
 
 #define INITIAL_CACHE_SIZE 1
-struct Cache_T{
+/*struct Cache_T{
         CacheObj_T *arr;
         int num_obj;
         int capacity;
-};
+};*/
 
 Cache_T new_cache()
 {

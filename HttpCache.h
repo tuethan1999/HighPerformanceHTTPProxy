@@ -14,7 +14,11 @@
 #ifndef HTTP_CACHE_H_INCLUDED
 #define HTTP_CACHE_H_INCLUDED
 
-typedef struct Cache_T *Cache_T;
+typedef struct Cache_T {
+	    CacheObj_T *arr;
+        int num_obj;
+        int capacity;
+}*Cache_T;
 
 /*
  * Function:  new_cache
