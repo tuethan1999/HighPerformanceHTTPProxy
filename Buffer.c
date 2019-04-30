@@ -108,12 +108,19 @@ void deleteFromBufferList(bufferList buffer_list, int index)
         buffer_list->buffers[index] = NULL;
 }
 
-void clearFromBufferList(bufferList buffer_list, int index) {
+void clearFromBufferList(bufferList buffer_list, int index, int length) {
         fprintf(stderr, "clearing buffer of fd: %d\n", index);
         partialBuffer_ptr partial_buffer =  buffer_list->buffers[index];
-        deletePartialBuffer(partial_buffer);
-        partialBuffer_ptr new_partial_buffer =  newPartialBuffer();
-        insertBufferList(buffer_list, new_partial_buffer, index);
+        char *new_buffer = malloc(partial_buffer->size);
+        bzero(new_buffer, partial_buffer->size);
+        int bytes_to_copy = partial_buffer->size - partial_buffer->length;
+        memcpy(new_buffer, partial_buffer->buffer+length, bytes_to_copy);
+
+        free(partial_buffer->buffer);
+        partial_buffer->buffer = new_buffer;
+        //deletePartialBuffer(partial_buffer);
+        //partialBuffer_ptr new_partial_buffer =  newPartialBuffer();
+        //insertBufferList(buffer_list, new_partial_buffer, index);
 }
 
 void printBufferList(bufferList buffer_list)

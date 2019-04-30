@@ -40,7 +40,7 @@ void deletePartialBuffer(partialBuffer_ptr partial_buffer);
 bufferList newBufferList();
 void insertBufferList(bufferList buffer_list, partialBuffer_ptr partial_buffer, int index);
 void deleteFromBufferList(bufferList buffer_list, int index);
-void clearFromBufferList(bufferList buffer_list, int index);
+void clearFromBufferList(bufferList buffer_list, int index, int length);
 void printBufferList(bufferList buffer_list);
 
 #endif
