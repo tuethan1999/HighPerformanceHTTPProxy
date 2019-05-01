@@ -612,26 +612,26 @@ void printSecureNodeList(secureNodeList node_list) {
 /*************************************************************************************************************************************/
 
 void add_tokens(bufferList buffer_list, int listen_sock, int length) {
-        //printf("in add_tokens\n");
+        printf("in add_tokens\n");
         for (int i = listen_sock+1; i < length; i++) {
                 if (buffer_list->buffers[i] != NULL) {
                         Bucket_ptr bucket = buffer_list->buffers[i]->bucket;
-                        //printf("%d not NULL, has %d tokens\n", i, buffer_list->buffers[i]->bucket->tokens);
+                        printf("%d not NULL, has %d tokens\n", i, buffer_list->buffers[i]->bucket->tokens);
                         struct timeval now;
                         gettimeofday(&now, NULL);
-                        int now_time = 1000000*now.tv_sec + now.tv_usec;
-                        int last_time = 1000000*bucket->last_updated.tv_sec + bucket->last_updated.tv_usec;
-                        //printf("time now: %d\n last update: %d\n", now_time, last_time);
-                        int between_updates = now_time - last_time;
-                        //printf("time since last update: %d\n", between_updates);
-                        int num_tokens = (between_updates * bucket->token_rate)/1000000;
+                        long now_time = 1000000*now.tv_sec + now.tv_usec;
+                        long last_time = 1000000*bucket->last_updated.tv_sec + bucket->last_updated.tv_usec;
+                        printf("time now: %ld\n last update: %ld\n", now_time, last_time);
+                        long between_updates = now_time - last_time;
+                        printf("time since last update: %ld\n", between_updates);
+                        long num_tokens = (between_updates * bucket->token_rate)/1000000;
                         if (bucket->tokens + num_tokens > bucket->bucket_size) {
                                 bucket->tokens = bucket->bucket_size;
-                                //printf("fd %d has a full bucket\n", i);
+                                printf("fd %d has a full bucket\n", i);
                         }
                         else {
                                 bucket->tokens += num_tokens;
-                                //printf("added %d tokens to fd %d. bucket contains %d tokens\n", num_tokens, i, bucket->tokens);
+                                printf("added %ld tokens to fd %d. bucket contains %d tokens\n", num_tokens, i, bucket->tokens);
                         }
                         gettimeofday(&bucket->last_updated, NULL);
                 }
@@ -641,6 +641,7 @@ void add_tokens(bufferList buffer_list, int listen_sock, int length) {
 int use_tokens(bufferList buffer_list, char *msg, int recv_fd, int msg_size) {
         printf("fd %d has %d tokens\n", recv_fd, buffer_list->buffers[recv_fd]->bucket->tokens);
         if (buffer_list->buffers[recv_fd]->bucket->tokens >= msg_size) {
+                printf("fd %d has enough tokens\n", recv_fd);
                 int n = write(recv_fd, msg, msg_size);
                 if (n < 0)
                         server_error("ERROR writing to client");
@@ -648,11 +649,14 @@ int use_tokens(bufferList buffer_list, char *msg, int recv_fd, int msg_size) {
                 printf("after writing, fd %d has %d tokens\n", recv_fd, buffer_list->buffers[recv_fd]->bucket->tokens);
                 return n;
         }
-        else
+        else {
+                printf("Message is %d bytes long: fd %d needs %d more tokens before sending\n", msg_size, recv_fd, msg_size-buffer_list->buffers[recv_fd]->bucket->tokens);
                 return -1;
+        }
 }
 
 void check_cached_messages(Cache_T cache, bufferList buffer_list) {
+        printf("in check_cached_messages\n");
         for (int i = 0; i < cache->num_obj; i++) {
                 if (cache->arr[i] == NULL)
                         continue;

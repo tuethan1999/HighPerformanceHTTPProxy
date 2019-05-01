@@ -15,8 +15,8 @@
 
 #define BUFSIZE 2*4096
 #define BUFLISTSIZE 1
-#define BUCKET_SIZE 2*BUFSIZE
-#define TOKEN_RATE 500 // per second
+#define BUCKET_SIZE 50000000
+#define TOKEN_RATE 500000 // per second
 
 typedef struct partialBuffer {
         char *buffer;
