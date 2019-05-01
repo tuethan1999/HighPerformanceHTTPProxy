@@ -34,17 +34,17 @@ partialBuffer_ptr newPartialBuffer()
 
 void insertPartialBuffer(partialBuffer_ptr partial_buffer, char* msg, int length)
 {
-        printf("in insertPartialBuffer, current buffer length: %d\n", partial_buffer->length);
+        //printf("in insertPartialBuffer, current buffer length: %d\n", partial_buffer->length);
         if (length >= partial_buffer->size - partial_buffer->length) {
                 int new_size = 2*partial_buffer->size;
-                fprintf(stderr, "length of msg is %d, expanding partial buffer size from %d -> %d\n", length, partial_buffer->size, new_size);
+                //fprintf(stderr, "length of msg is %d, expanding partial buffer size from %d -> %d\n", length, partial_buffer->size, new_size);
                 partial_buffer->buffer = realloc(partial_buffer->buffer, new_size);
                 partial_buffer->size = new_size;
         }
         int position = partial_buffer->length;
         memcpy(partial_buffer->buffer + position, msg, length);
         partial_buffer->length += length;
-        printf("added %d bytes, current length is %d\n", length, partial_buffer->length);
+        //printf("added %d bytes, current length is %d\n", length, partial_buffer->length);
 }
 
 void printPartialBuffer(partialBuffer_ptr partial_buffer)

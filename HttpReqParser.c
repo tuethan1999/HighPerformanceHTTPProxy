@@ -76,20 +76,14 @@ int parse_http_req(HttpReqHead_T header, char* buffer, int buffer_size)
                 if(string_is_number(token)){
                         header->port = atoi(token);
                 }
-                /*else if(strncmp("User-Agent", token, strlen("User-Agent")) == 0){
-                        token = strtok(NULL, "\r\n: ");
-                        header->user_agent = strdup(token);
-                }
-                else if(strncmp("Accept", token, strlen("Accept")) == 0){
-                        token = strtok(NULL, "\r\n: ");
-                        header->accept = strdup(token);
-                }
-                else if(strncmp("Proxy-Connection", token,
-                 strlen("Proxy-Connection")) == 0){
-                        token = strtok(NULL, "\r\n: ");
-                        header->proxy_connection = strdup(token);
-                }*/
                 token = strtok(NULL, "\r\n: ");
+        }
+
+        if(header->host == NULL){
+                char* temp = strdup(header->url);
+                token = strtok(temp, ":");
+                header->host = strdup(token);
+                free(temp);
         }
         return 1;
 }

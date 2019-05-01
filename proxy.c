@@ -93,7 +93,7 @@ int main(int argc, char *argv[])
 
         while(1){    
                 //sleep(2);
-                add_tokens(buffer_list, listen_fd, max_sock); 
+                add_tokens(buffer_list, listen_fd, max_sock);
                 check_cached_messages(cache, buffer_list);  
                 FD_ZERO(&copy_fd_set);
                 memcpy(&copy_fd_set, &master_fd_set, sizeof(master_fd_set));
@@ -122,7 +122,7 @@ int main(int argc, char *argv[])
                         //print_cache(cache);
                 }
                 // need to check if fd in server list 
-                //delete_expired(cache);
+                delete_expired(cache);
         }  
         return 0;
 }
@@ -202,7 +202,7 @@ void handleNewConnection(int fd, fd_set* master_fd_set, bufferList buffer_list, 
 
 int handleExistingConnection(int fd, fd_set *master_fd_set, int *max_sock_ptr, bufferList buffer_list, Cache_T cache, serverNode_ptr *server_list, secureNodeList secure_list)
 {
-        fprintf(stderr, "Message incoming on existing fd %d\n", fd);
+        //fprintf(stderr, "Message incoming on existing fd %d\n", fd);
         char *buffer = malloc(sizeof(char)* BUFSIZE);
         bzero(buffer, BUFSIZE);
         int n = read(fd, buffer, BUFSIZE);
@@ -215,9 +215,9 @@ int handleExistingConnection(int fd, fd_set *master_fd_set, int *max_sock_ptr, b
                 return 0;
         }
         else {
-                fprintf(stderr, "Read %d bytes from fd: %d\n", n, fd);
+                //fprintf(stderr, "Read %d bytes from fd: %d\n", n, fd);
                 insertPartialBuffer(buffer_list->buffers[fd], buffer, n);
-                printf("successfully added to partial message buffer\n");
+                //printf("successfully added to partial message buffer\n");
                 char *url = isServer(*server_list, fd);
                 if(url){
                         handleServer(fd, master_fd_set, buffer_list, cache, url, server_list, secure_list);
@@ -257,7 +257,7 @@ void handleClient(int fd, fd_set *master_fd_set, int *max_sock_ptr, bufferList b
         if(parse_http_req(req_header, partial_buffer->buffer, partial_buffer->length))
         {
                 fprintf(stderr, "fd %d has a complete header\n", fd);
-                print_http_req_head(req_header);
+                //print_http_req_head(req_header);
                 CacheObj_T cache_obj = find_by_url(cache, req_header->url);
                 if(cache_obj == NULL){
                         
@@ -294,11 +294,9 @@ void handleClient(int fd, fd_set *master_fd_set, int *max_sock_ptr, bufferList b
                                 cache_obj->last_requested = time(NULL);
                                 utarray_push_back(cache_obj->client_fds, &fd);
                                 insert_into_cache(cache, cache_obj);
+                                printf("added %s to cache\n", cache_obj->url);
 
                                 printf("writing this to the server:\n");
-                                for (int i = 0; i < cache_obj->request_length; i++) {
-                                        printf("%c", cache_obj->request_buffer[i]);
-                                }
                                 int n = write(serv_fd, cache_obj->request_buffer, cache_obj->request_length);
                                 if (n < 0)
                                         server_error("ERROR writing to server");
@@ -356,7 +354,7 @@ void handleServer(int fd, fd_set *master_fd_set, bufferList buffer_list, Cache_T
         int complete_header = parse_http_res(res_header, partial_buffer->buffer, partial_buffer->length);
         if(complete_header && res_header->header_length + res_header->content_length == partial_buffer->length)
         {
-                print_http_res_head(res_header);
+                //print_http_res_head(res_header);
                 CacheObj_T cache_obj = find_by_url(cache, url);
                 assert(cache_obj != NULL);
                 cache_obj->response_buffer = realloc(cache_obj->response_buffer, partial_buffer->length);
@@ -431,6 +429,7 @@ void pushFrontServerNode(serverNode_ptr *server_list, serverNode_ptr new_node)
 }
 void printServerList(serverNode_ptr server_list)
 {
+        printf("in printServerList\n");
         if(server_list == NULL){
                 fprintf(stderr, "%s\n", "empty server list");
                 return;
@@ -613,26 +612,26 @@ void printSecureNodeList(secureNodeList node_list) {
 /*************************************************************************************************************************************/
 
 void add_tokens(bufferList buffer_list, int listen_sock, int length) {
-        printf("in add_tokens\n");
+        //printf("in add_tokens\n");
         for (int i = listen_sock+1; i < length; i++) {
                 if (buffer_list->buffers[i] != NULL) {
                         Bucket_ptr bucket = buffer_list->buffers[i]->bucket;
-                        printf("%d not NULL, has %d tokens\n", i, buffer_list->buffers[i]->bucket->tokens);
+                        //printf("%d not NULL, has %d tokens\n", i, buffer_list->buffers[i]->bucket->tokens);
                         struct timeval now;
                         gettimeofday(&now, NULL);
                         int now_time = 1000000*now.tv_sec + now.tv_usec;
                         int last_time = 1000000*bucket->last_updated.tv_sec + bucket->last_updated.tv_usec;
-                        printf("time now: %d\n last update: %d\n", now_time, last_time);
+                        //printf("time now: %d\n last update: %d\n", now_time, last_time);
                         int between_updates = now_time - last_time;
-                        printf("time since last update: %d\n", between_updates);
+                        //printf("time since last update: %d\n", between_updates);
                         int num_tokens = (between_updates * bucket->token_rate)/1000000;
                         if (bucket->tokens + num_tokens > bucket->bucket_size) {
                                 bucket->tokens = bucket->bucket_size;
-                                printf("fd %d has a full bucket\n", i);
+                                //printf("fd %d has a full bucket\n", i);
                         }
                         else {
                                 bucket->tokens += num_tokens;
-                                printf("added %d tokens to fd %d. bucket contains %d tokens\n", num_tokens, i, bucket->tokens);
+                                //printf("added %d tokens to fd %d. bucket contains %d tokens\n", num_tokens, i, bucket->tokens);
                         }
                         gettimeofday(&bucket->last_updated, NULL);
                 }
@@ -655,6 +654,8 @@ int use_tokens(bufferList buffer_list, char *msg, int recv_fd, int msg_size) {
 
 void check_cached_messages(Cache_T cache, bufferList buffer_list) {
         for (int i = 0; i < cache->num_obj; i++) {
+                if (cache->arr[i] == NULL)
+                        continue;
                 if (cache->arr[i]->response_buffer != NULL) {
                         for(int *p=(int*)utarray_front(cache->arr[i]->client_fds); p!=NULL; p=(int*)utarray_next(cache->arr[i]->client_fds,p)) {
                                 use_tokens(buffer_list, cache->arr[i]->response_buffer, *p, cache->arr[i]->response_length);

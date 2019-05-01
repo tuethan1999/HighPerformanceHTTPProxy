@@ -75,7 +75,8 @@ void free_cache_object(CacheObj_T cache_obj)
         free(cache_obj->url);
         free(cache_obj->request_buffer);
         free(cache_obj->response_buffer);
-        free(cache_obj);
         free_req_head(cache_obj->req_header);
         free_res_head(cache_obj->res_header);
+        free(cache_obj);
+
 }

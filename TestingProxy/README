@@ -1,0 +1,26 @@
+README
+
+Python Script to get performance data on you HTTP/HTTPS Proxy.
+
+SETUP
+
+pip install -r requirements.txt  (pardon if I forget a library)
+
+Open config.json and fill the following parameters:
+	- proxyIp
+	- proxyPort
+	- urls: list of urls on which to do GET requests
+	- numClients: Initial number of concurrent clients (int)
+	- reqsPerClient: Requests each client makes (int)
+	- iterations: number of linear increments to do on numClients (int)
+	- numRequests: Number of Total Requests to do CDF comparison between proxy and no proxy (int)
+
+
+RUN
+
+pyhton main.py
+
+
+OUTPUT
+
+Multiple Data Plots with Load Results and Proxy vs. Non-Proxy Latency Comparisons

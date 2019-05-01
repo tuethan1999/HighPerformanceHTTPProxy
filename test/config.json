@@ -1,0 +1,12 @@
+{
+  "proxyIp": "localhost",
+  "proxyPort": 9180,
+  "urls": [
+    "http://www.cs.cmu.edu/~dga/dga-headshot.jpg",
+    "http://www.cs.tufts.edu/comp/112/"
+  ],
+  "numClients": 10,
+  "reqsPerClient": 10,
+  "iterations": 10,
+  "numRequests": 500
+}
