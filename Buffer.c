@@ -63,14 +63,14 @@ void printPartialBuffer(partialBuffer_ptr partial_buffer)
 
 void deletePartialBuffer(partialBuffer_ptr partial_buffer)
 {
-        printf("in deletePartialBuffer\n");
+        //printf("in deletePartialBuffer\n");
         if(partial_buffer == NULL) return;
         free(partial_buffer->buffer);
-        printf("freed partial_buffer->buffer\n");
+        //printf("freed partial_buffer->buffer\n");
         free(partial_buffer->bucket);
-        printf("freed partial_buffer->bucket\n");
+        //printf("freed partial_buffer->bucket\n");
         free(partial_buffer);
-        printf("freed partial_buffer\n");
+        //printf("freed partial_buffer\n");
 }
 
 bufferList newBufferList()
@@ -90,7 +90,7 @@ void insertBufferList(bufferList buffer_list, partialBuffer_ptr partial_buffer, 
                 int new_size = 2*buffer_list->size;
                 int new_size_bytes = new_size * sizeof(partialBuffer_ptr);
                 int old_size_bytes = buffer_list->size * sizeof(partialBuffer_ptr);
-                fprintf(stderr, "index is %d, expanding buffer list size from %d -> %d\n", index, buffer_list->size, new_size);
+                //fprintf(stderr, "index is %d, expanding buffer list size from %d -> %d\n", index, buffer_list->size, new_size);
                 partialBuffer_ptr *new_list = malloc(new_size_bytes);
                 memset(new_list, 0, new_size_bytes);
                 memcpy(new_list, buffer_list->buffers, old_size_bytes);
@@ -110,18 +110,18 @@ void deleteFromBufferList(bufferList buffer_list, int index)
 }
 
 void clearFromBufferList(bufferList buffer_list, int index, int length) {
-        fprintf(stderr, "clearing buffer of fd: %d\n", index);
+        //fprintf(stderr, "clearing buffer of fd: %d\n", index);
         partialBuffer_ptr partial_buffer =  buffer_list->buffers[index];
         char *new_buffer = malloc(partial_buffer->size);
         bzero(new_buffer, partial_buffer->size);
-        printf("size is %d, length is %d\n", partial_buffer->size, partial_buffer->length);
+        //printf("size is %d, length is %d\n", partial_buffer->size, partial_buffer->length);
         int bytes_to_copy = partial_buffer->size - partial_buffer->length;
         memcpy(new_buffer, partial_buffer->buffer+length, bytes_to_copy);
 
         free(partial_buffer->buffer);
         partial_buffer->buffer = new_buffer;
         partial_buffer->length -= length;
-        printf("finished clearing, current buffer length is %d\n", partial_buffer->length);
+        //printf("finished clearing, current buffer length is %d\n", partial_buffer->length);
 }
 
 void printBufferList(bufferList buffer_list)

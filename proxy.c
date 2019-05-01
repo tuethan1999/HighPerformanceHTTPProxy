@@ -253,7 +253,7 @@ void handleClient(int fd, fd_set *master_fd_set, int *max_sock_ptr, bufferList b
 {
         HttpReqHead_T req_header = new_req_head();
         partialBuffer_ptr partial_buffer = buffer_list->buffers[fd];
-        printf("attemping to parse buffer, might break things\n");
+        //printf("attempting to parse buffer, might break things\n");
         if(parse_http_req(req_header, partial_buffer->buffer, partial_buffer->length))
         {
                 fprintf(stderr, "fd %d has a complete header\n", fd);
@@ -296,7 +296,7 @@ void handleClient(int fd, fd_set *master_fd_set, int *max_sock_ptr, bufferList b
                                 insert_into_cache(cache, cache_obj);
                                 printf("added %s to cache\n", cache_obj->url);
 
-                                printf("writing this to the server:\n");
+                                //printf("writing this to the server:\n");
                                 int n = write(serv_fd, cache_obj->request_buffer, cache_obj->request_length);
                                 if (n < 0)
                                         server_error("ERROR writing to server");
@@ -332,7 +332,7 @@ void handleClient(int fd, fd_set *master_fd_set, int *max_sock_ptr, bufferList b
                 else{
                         fprintf(stderr, "%s\n", "Invalid response in cache");
                 }
-                printf("entering clearFromBufferList\n");
+                //printf("entering clearFromBufferList\n");
                 clearFromBufferList(buffer_list, fd, partial_buffer->length);
         }
         else if (findNodeBySockfd(secure_list, fd) > 0) {
@@ -612,26 +612,26 @@ void printSecureNodeList(secureNodeList node_list) {
 /*************************************************************************************************************************************/
 
 void add_tokens(bufferList buffer_list, int listen_sock, int length) {
-        printf("in add_tokens\n");
+        //printf("in add_tokens\n");
         for (int i = listen_sock+1; i < length; i++) {
                 if (buffer_list->buffers[i] != NULL) {
                         Bucket_ptr bucket = buffer_list->buffers[i]->bucket;
-                        printf("%d not NULL, has %d tokens\n", i, buffer_list->buffers[i]->bucket->tokens);
+                        //printf("%d not NULL, has %d tokens\n", i, buffer_list->buffers[i]->bucket->tokens);
                         struct timeval now;
                         gettimeofday(&now, NULL);
                         long now_time = 1000000*now.tv_sec + now.tv_usec;
                         long last_time = 1000000*bucket->last_updated.tv_sec + bucket->last_updated.tv_usec;
-                        printf("time now: %ld\n last update: %ld\n", now_time, last_time);
+                        //printf("time now: %ld\n last update: %ld\n", now_time, last_time);
                         long between_updates = now_time - last_time;
-                        printf("time since last update: %ld\n", between_updates);
+                        //printf("time since last update: %ld\n", between_updates);
                         long num_tokens = (between_updates * bucket->token_rate)/1000000;
                         if (bucket->tokens + num_tokens > bucket->bucket_size) {
                                 bucket->tokens = bucket->bucket_size;
-                                printf("fd %d has a full bucket\n", i);
+                                //printf("fd %d has a full bucket\n", i);
                         }
                         else {
                                 bucket->tokens += num_tokens;
-                                printf("added %ld tokens to fd %d. bucket contains %d tokens\n", num_tokens, i, bucket->tokens);
+                                //printf("added %ld tokens to fd %d. bucket contains %d tokens\n", num_tokens, i, bucket->tokens);
                         }
                         gettimeofday(&bucket->last_updated, NULL);
                 }
@@ -641,22 +641,23 @@ void add_tokens(bufferList buffer_list, int listen_sock, int length) {
 int use_tokens(bufferList buffer_list, char *msg, int recv_fd, int msg_size) {
         printf("fd %d has %d tokens\n", recv_fd, buffer_list->buffers[recv_fd]->bucket->tokens);
         if (buffer_list->buffers[recv_fd]->bucket->tokens >= msg_size) {
-                printf("fd %d has enough tokens\n", recv_fd);
+                //printf("fd %d has enough tokens\n", recv_fd);
+                printf("Response sent to fd %d\n", recv_fd);
                 int n = write(recv_fd, msg, msg_size);
                 if (n < 0)
                         server_error("ERROR writing to client");
                 buffer_list->buffers[recv_fd]->bucket->tokens -= msg_size;
-                printf("after writing, fd %d has %d tokens\n", recv_fd, buffer_list->buffers[recv_fd]->bucket->tokens);
+                //printf("after writing, fd %d has %d tokens\n", recv_fd, buffer_list->buffers[recv_fd]->bucket->tokens);
                 return n;
         }
         else {
-                printf("Message is %d bytes long: fd %d needs %d more tokens before sending\n", msg_size, recv_fd, msg_size-buffer_list->buffers[recv_fd]->bucket->tokens);
+                printf("Message is %d bytes long; fd %d needs %d more tokens before sending\n", msg_size, recv_fd, msg_size-buffer_list->buffers[recv_fd]->bucket->tokens);
                 return -1;
         }
 }
 
 void check_cached_messages(Cache_T cache, bufferList buffer_list) {
-        printf("in check_cached_messages\n");
+        //printf("in check_cached_messages\n");
         for (int i = 0; i < cache->num_obj; i++) {
                 if (cache->arr[i] == NULL)
                         continue;

@@ -51,9 +51,11 @@ CacheObj_T find_by_url(Cache_T cache, char* url)
                 if(cache->arr[i] == NULL)
                         continue;
                 if(strcmp(cache->arr[i]->url, url) == 0){
+                        printf("Found in cache\n");
                         return cache->arr[i];
                 }
         }
+        printf("Could not be found in cache\n");
         return NULL;
 }
 
@@ -71,7 +73,7 @@ void print_cache(Cache_T cache)
 
 void delete_expired(Cache_T cache)
 {
-        fprintf(stderr, "%s\n", "checking expired");
+        //fprintf(stderr, "%s\n", "checking expired");
         for(int i = 0; i < cache->capacity; i++){
                 CacheObj_T cache_obj = cache->arr[i];
                 if(cache_obj == NULL || cache_obj->res_header == NULL || cache_obj->last_updated == -1)
