@@ -23,4 +23,10 @@ utarray.h| dynamic array implementation
 uthash.h| hash table implementation
 
 ### Testing
-Performance tests located in performance_tests folder
+We can see that we get relatively stable performance with fixed number of clients but we have decreasing performance with more clients. This shows how rate limiting allows us to manage performance against greedy clients but is still susceptible to a denial of service style attack
+
+##### Performance with fixed requests per client and variable numbr of clients
+![performance with fixed clients](/performance_tests/ten_requests.png)
+
+##### Performance with fixed clients and variable number of requests per client
+![performance with fixed clients](/performance_tests/ten_clients.png)
