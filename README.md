@@ -1,4 +1,5 @@
-# HighPerformanceHTTPProxy
+#### The github pages does not display tables correctly. Please visit the actual github repository to see a breakdown of the files at https://github.com/tuethan1999/http-proxy
+# High Performance HTTP proxy
 
 The purpose of this project was to create a robust high performance proxy with the following features:
 - HTTP caching
